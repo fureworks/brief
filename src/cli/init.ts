@@ -1,0 +1,100 @@
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import chalk from "chalk";
+import { getBriefDir, FILES, DIRS } from "../store/paths.js";
+import { makeFrontmatter } from "../store/frontmatter.js";
+
+interface InitOptions {
+  template?: string;
+  detect?: boolean;
+}
+
+const STARTUP_PRIORITIES = `# Priorities
+
+## NOW
+- (Add your top priority items here)
+
+## TODAY
+- (Add items to fit in today)
+
+## IGNORED (0 items)
+`;
+
+const STARTUP_DECISIONS = `# Recent Decisions
+
+## ${new Date().toISOString().split("T")[0]}
+- (Log decisions from meetings and discussions here)
+`;
+
+const STARTUP_TEAM = `# Team
+
+| Name | Role | Focus |
+|------|------|-------|
+| (Add team members) | | |
+`;
+
+const STARTUP_OVERRIDES = `# Overrides
+# This is the only file you edit directly. The CLI reads it during sync.
+
+## Add
+# - Item to inject into priorities
+#   Reason: why
+#   Expires: YYYY-MM-DD
+
+## Remove
+# - issue:repo#N  # reason
+
+## Boost
+# - pr:repo#N
+#   Priority: now
+`;
+
+export async function initCommand(options: InitOptions): Promise<void> {
+  const briefDir = getBriefDir();
+
+  if (existsSync(briefDir)) {
+    console.log(chalk.yellow("  .brief/ already exists. Use brief validate to check integrity.\n"));
+    return;
+  }
+
+  // Create directories
+  mkdirSync(briefDir, { recursive: true });
+  mkdirSync(join(briefDir, DIRS.state), { recursive: true });
+  mkdirSync(join(briefDir, DIRS.people), { recursive: true });
+
+  const fm = makeFrontmatter();
+  const useTemplate = options.template === "startup";
+
+  // Create files
+  writeFileSync(join(briefDir, FILES.priorities), fm + (useTemplate ? STARTUP_PRIORITIES : "# Priorities\n"));
+  writeFileSync(join(briefDir, FILES.decisions), fm + (useTemplate ? STARTUP_DECISIONS : "# Recent Decisions\n"));
+  writeFileSync(join(briefDir, FILES.team), fm + (useTemplate ? STARTUP_TEAM : "# Team\n"));
+  writeFileSync(join(briefDir, FILES.overrides), useTemplate ? STARTUP_OVERRIDES : "# Overrides\n");
+  writeFileSync(join(briefDir, FILES.agentLog), "# Agent Actions\n");
+  writeFileSync(join(briefDir, FILES.hash), "");
+  writeFileSync(join(briefDir, FILES.sources), "");
+
+  console.log(chalk.green("  ✓ .brief/ initialized.\n"));
+
+  if (useTemplate) {
+    console.log(chalk.dim("  Template: startup (with example content)"));
+    console.log(chalk.dim("  Edit .brief/priorities.md to add your team's priorities.\n"));
+  }
+
+  // Detect existing conventions
+  if (options.detect !== false) {
+    const cwd = process.cwd();
+    const conventions = [
+      { file: "CLAUDE.md", tool: "Claude Code" },
+      { file: "AGENTS.md", tool: "AI agents" },
+      { file: ".cursorrules", tool: "Cursor" },
+      { file: ".codex/instructions", tool: "Codex" },
+    ];
+
+    for (const { file, tool } of conventions) {
+      if (existsSync(join(cwd, file))) {
+        console.log(chalk.dim(`  Found ${file} (${tool}). Run 'brief snippet ${tool.toLowerCase().split(" ")[0]}' to get integration code.\n`));
+      }
+    }
+  }
+}

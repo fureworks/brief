@@ -88,12 +88,16 @@ function renderPriorities(results: SourceResult[], config: BriefConfig): string 
         const label = i.label || i.title || i.id || "Unknown";
         const detail = i.detail || i.description || "";
         const reason = i.reason || "";
-        nowItems.push(`- ${label}\n  ${detail}${reason ? `\n  Why: ${reason}` : ""}\n  Source: ${result.name}`);
+        const status = i.status || "active";
+        if (status === "completed") { ignoredCount++; continue; }
+        nowItems.push(`- ${label} [status: ${status}]\n  ${detail}${reason ? `\n  Why: ${reason}` : ""}\n  Source: ${result.name}`);
       } else if (i.priority === "today" || i.priority === "TODAY") {
         const label = i.label || i.title || i.id || "Unknown";
         const detail = i.detail || i.description || "";
         const reason = i.reason || "";
-        todayItems.push(`- ${label}\n  ${detail}${reason ? `\n  Why: ${reason}` : ""}\n  Source: ${result.name}`);
+        const status = i.status || "active";
+        if (status === "completed") { ignoredCount++; continue; }
+        todayItems.push(`- ${label} [status: ${status}]\n  ${detail}${reason ? `\n  Why: ${reason}` : ""}\n  Source: ${result.name}`);
       } else {
         ignoredCount++;
       }
@@ -189,6 +193,36 @@ function writeSourcesMetadata(results: SourceResult[]): void {
   writeFileSync(join(briefDir, FILES.sources), lines.join("\n"));
 }
 
+function archiveExpired(briefDir: string): void {
+  const priFile = join(briefDir, FILES.priorities);
+  if (!existsSync(priFile)) return;
+
+  let content = readFileSync(priFile, "utf-8");
+  const today = new Date().toISOString().split("T")[0];
+
+  // Find and remove expired sections
+  const expiresRegex = /<!-- expires: (\d{4}-\d{2}-\d{2}) -->/g;
+  let match;
+  let archived = 0;
+
+  while ((match = expiresRegex.exec(content)) !== null) {
+    if (match[1] <= today) {
+      // Find the section this belongs to and comment it out
+      const lineStart = content.lastIndexOf("\n##", match.index);
+      const nextSection = content.indexOf("\n##", match.index + 1);
+      if (lineStart >= 0) {
+        const section = content.slice(lineStart, nextSection > 0 ? nextSection : undefined);
+        content = content.replace(section, `\n<!-- ARCHIVED (expired ${match[1]}) ${section.trim()} -->\n`);
+        archived++;
+      }
+    }
+  }
+
+  if (archived > 0) {
+    writeFileSync(priFile, content);
+  }
+}
+
 export async function syncCommand(): Promise<void> {
   const briefDir = getBriefDir();
 
@@ -235,6 +269,9 @@ export async function syncCommand(): Promise<void> {
 
   // Write source health metadata
   writeSourcesMetadata(results);
+
+  // Auto-archive expired items
+  archiveExpired(briefDir);
 
   // Update hash
   writeHash(computeHash());

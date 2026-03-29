@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { getBriefDir, FILES } from "../store/paths.js";
-import { loadConfig } from "../store/config.js";
+import { sendNotification } from "../store/notify.js";
 import { computeHash, writeHash } from "../store/hash.js";
 
 interface UrgentOptions {
@@ -52,20 +52,5 @@ export async function urgentCommand(message: string, options: UrgentOptions): Pr
   console.log(chalk.dim(`  Expires: ${expires}\n`));
 
   // Send Telegram notification if configured
-  const config = loadConfig();
-  if (config.notify.enabled && config.notify.telegram_bot_token && config.notify.telegram_chat_id) {
-    try {
-      const { exec } = await import("node:child_process");
-      const { promisify } = await import("node:util");
-      const execAsync = promisify(exec);
-      const text = `⚠️ Brief URGENT: ${message}`;
-      await execAsync(
-        `curl -s -X POST "https://api.telegram.org/bot${config.notify.telegram_bot_token}/sendMessage" -d chat_id="${config.notify.telegram_chat_id}" -d text="${text.replace(/"/g, '\\"')}"`,
-        { timeout: 5000 }
-      );
-      console.log(chalk.dim("  Telegram notification sent.\n"));
-    } catch {
-      console.log(chalk.dim("  Telegram notification failed (non-blocking).\n"));
-    }
-  }
+  await sendNotification(message);
 }

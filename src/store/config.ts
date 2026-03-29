@@ -26,7 +26,6 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
   for (const path of candidates) {
     if (existsSync(path)) {
       try {
-        // Simple TOML parsing for the fields we need
         const raw = readFileSync(path, "utf-8");
         const config = { ...DEFAULT_CONFIG };
 
@@ -39,6 +38,25 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
 
         const chatMatch = raw.match(/telegram_chat_id\s*=\s*"([^"]*)"/);
         if (chatMatch) config.notify.telegram_chat_id = chatMatch[1];
+
+        // Parse stale threshold
+        const staleMatch = raw.match(/stale_threshold_hours\s*=\s*(\d+)/);
+        if (staleMatch) config.health.stale_threshold_hours = parseInt(staleMatch[1], 10);
+
+        // Parse sources (TOML array of tables)
+        const sourceBlocks = raw.matchAll(/\[\[sources\]\]\s*\n([\s\S]*?)(?=\[\[|\[(?!\[)|$)/g);
+        config.sources = [];
+        for (const match of sourceBlocks) {
+          const block = match[1];
+          const name = block.match(/name\s*=\s*"([^"]*)"/)?.[1] || "";
+          const type = block.match(/type\s*=\s*"([^"]*)"/)?.[1] || "";
+          const command = block.match(/command\s*=\s*"([^"]*)"/)?.[1];
+          const srcPath = block.match(/path\s*=\s*"([^"]*)"/)?.[1];
+          const target = block.match(/target\s*=\s*"([^"]*)"/)?.[1] || "priorities";
+          const priority = parseInt(block.match(/priority\s*=\s*(\d+)/)?.[1] || "0", 10);
+          const timeout = parseInt(block.match(/timeout\s*=\s*(\d+)/)?.[1] || "15", 10);
+          config.sources.push({ name, type, command, path: srcPath, target, priority, timeout });
+        }
 
         return config;
       } catch {

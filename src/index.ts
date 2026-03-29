@@ -11,6 +11,10 @@ import { readCommand } from "./cli/read.js";
 import { statusCommand } from "./cli/status.js";
 import { snippetCommand } from "./cli/snippet.js";
 import { urgentCommand } from "./cli/urgent.js";
+import { syncCommand } from "./cli/sync.js";
+import { doctorCommand } from "./cli/doctor.js";
+import { assignCommand } from "./cli/assign.js";
+import { decisionCommand } from "./cli/decision.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -53,6 +57,26 @@ program
   .command("snippet [tool]")
   .description("Generate integration snippet for AI tools (claude, codex, cursor, openclaw)")
   .action(snippetCommand);
+
+program
+  .command("sync")
+  .description("Pull from configured sources and regenerate .brief/ files")
+  .action(syncCommand);
+
+program
+  .command("doctor")
+  .description("Check source health, stale files, config issues")
+  .action(doctorCommand);
+
+program
+  .command("assign <person> <item>")
+  .description("Assign a person to an item")
+  .action(assignCommand);
+
+program
+  .command("decision <description>")
+  .description("Log a decision manually")
+  .action(decisionCommand);
 
 program
   .command("urgent <message>")

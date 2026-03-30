@@ -3,9 +3,10 @@ import { join } from "node:path";
 
 export interface BriefConfig {
   brief: { version: number; maintainer?: string; team_repo?: string };
-  sources: Array<{ name: string; type: string; command?: string; path?: string; target: string; priority: number; timeout?: number; mapping?: Record<string, string> }>;
+  sources: Array<{ name: string; type: string; command?: string; path?: string; target: string; priority: number; timeout?: number; mapping?: Record<string, string>; files?: string[] }>;
   notify: { enabled: boolean; telegram_bot_token?: string; telegram_chat_id?: string };
   health: { stale_threshold_hours: number; source_failure_threshold: number };
+  hooks: { post_sync?: string };
 }
 
 const DEFAULT_CONFIG: BriefConfig = {
@@ -13,6 +14,7 @@ const DEFAULT_CONFIG: BriefConfig = {
   sources: [],
   notify: { enabled: false },
   health: { stale_threshold_hours: 4, source_failure_threshold: 2 },
+  hooks: {},
 };
 
 export function loadConfig(base: string = process.cwd()): BriefConfig {
@@ -55,6 +57,13 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
           const target = block.match(/target\s*=\s*"([^"]*)"/)?.[1] || "priorities";
           const priority = parseInt(block.match(/priority\s*=\s*(\d+)/)?.[1] || "0", 10);
           const timeout = parseInt(block.match(/timeout\s*=\s*(\d+)/)?.[1] || "15", 10);
+          // Parse files array if present
+          const filesMatch = block.match(/files\s*=\s*\[([^\]]*)\]/);
+          let files: string[] | undefined;
+          if (filesMatch) {
+            files = filesMatch[1].match(/"([^"]*)"/g)?.map((s) => s.replace(/"/g, "")) || [];
+          }
+
           // Parse mapping if present
           const mappingMatch = block.match(/mapping\s*=\s*\{([^}]*)\}/);
           let mapping: Record<string, string> | undefined;
@@ -65,8 +74,12 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
               mapping[pair[1]] = pair[2];
             }
           }
-          config.sources.push({ name, type, command, path: srcPath, target, priority, timeout, mapping });
+          config.sources.push({ name, type, command, path: srcPath, target, priority, timeout, mapping, files });
         }
+
+        // Parse hooks
+        const postSyncMatch = raw.match(/\[hooks\][\s\S]*?post_sync\s*=\s*"([^"]*)"/);
+        if (postSyncMatch) config.hooks = { post_sync: postSyncMatch[1] };
 
         return config;
       } catch {

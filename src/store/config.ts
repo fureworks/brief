@@ -81,6 +81,40 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
         const postSyncMatch = raw.match(/\[hooks\][\s\S]*?post_sync\s*=\s*"([^"]*)"/);
         if (postSyncMatch) config.hooks = { post_sync: postSyncMatch[1] };
 
+        // Parse enrichment section
+        const enrichSection = raw.match(/\[enrichment\]([\s\S]*?)(?=\n\[(?!\[)|$)/);
+        if (enrichSection) {
+          const block = enrichSection[1];
+          const ctxFiles = block.match(/context_files\s*=\s*\[([\s\S]*?)\]/);
+          const ghRepos = block.match(/github_repos\s*=\s*\[([\s\S]*?)\]/);
+          const ghFields = block.match(/github_fields\s*=\s*"([^"]*)"/);
+          const rules = block.match(/rules\s*=\s*"""([\s\S]*?)"""/);
+          const owner = block.match(/owner\s*=\s*"([^"]*)"/);
+
+          (config as any).enrichment = {
+            context_files: ctxFiles ? ctxFiles[1].match(/"([^"]*)"/g)?.map((s: string) => s.replace(/"/g, "")) : [],
+            github_repos: ghRepos ? ghRepos[1].match(/"([^"]*)"/g)?.map((s: string) => s.replace(/"/g, "")) : [],
+            github_fields: ghFields?.[1] || "number,title,reviewDecision,mergeable,labels",
+            rules: rules?.[1]?.trim() || "",
+            owner: owner?.[1] || "",
+          };
+        }
+
+        // Parse agent views
+        const agentSections = raw.matchAll(/\[agents\.(\w+)\]\s*\n([\s\S]*?)(?=\[|$)/g);
+        const agents: Record<string, { focus?: string[]; hide?: string[] }> = {};
+        for (const match of agentSections) {
+          const name = match[1];
+          const block = match[2];
+          const focus = block.match(/focus\s*=\s*\[([\s\S]*?)\]/);
+          const hide = block.match(/hide\s*=\s*\[([\s\S]*?)\]/);
+          agents[name] = {
+            focus: focus ? focus[1].match(/"([^"]*)"/g)?.map((s: string) => s.replace(/"/g, "")) : undefined,
+            hide: hide ? hide[1].match(/"([^"]*)"/g)?.map((s: string) => s.replace(/"/g, "")) : undefined,
+          };
+        }
+        if (Object.keys(agents).length > 0) (config as any).agents = agents;
+
         return config;
       } catch {
         return DEFAULT_CONFIG;

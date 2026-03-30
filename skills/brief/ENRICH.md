@@ -7,10 +7,12 @@ This is the step that turns "PR #62 is 46 days old" into "PR #62 is 46 days old,
 ## The Enrichment Flow
 
 ```
-brief sync                     # 1. Pull raw signals from configured sources
-[agent reads + enriches]       # 2. Agent cross-references with KB, pipeline, meetings
+brief sync                     # 1. Pulls raw signals → writes priorities-raw.md (never touches priorities.md)
+[agent reads raw + enriches]   # 2. Agent reads priorities-raw.md + KB + pipeline → writes priorities.md
 brief validate                 # 3. Verify output is well-formed
 ```
+
+**Key:** `brief sync` writes to `priorities-raw.md` and `decisions-raw.md`. Your enriched `priorities.md` and `decisions.md` are NEVER overwritten by sync. This means your enrichment persists across syncs.
 
 ## Step-by-Step
 
@@ -18,7 +20,8 @@ brief validate                 # 3. Verify output is well-formed
 
 ```bash
 brief sync
-brief read priorities          # see what sync produced
+brief read priorities-raw      # see what sync produced (raw, unenriched)
+brief read priorities          # see the current enriched version (your last enrichment)
 ```
 
 ### 2. Gather context sources

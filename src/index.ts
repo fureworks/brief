@@ -15,6 +15,10 @@ import { syncCommand } from "./cli/sync.js";
 import { doctorCommand } from "./cli/doctor.js";
 import { assignCommand } from "./cli/assign.js";
 import { decisionCommand } from "./cli/decision.js";
+import { graphCommand } from "./cli/graph.js";
+import { logCommand } from "./cli/log.js";
+import { overrideCommand } from "./cli/override.js";
+import { migrateCommand } from "./cli/migrate.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -77,6 +81,34 @@ program
   .command("decision <description>")
   .description("Log a decision manually")
   .action(decisionCommand);
+
+program
+  .command("graph [args...]")
+  .description("Manage relationships between items (add, query, list)")
+  .option("--json", "Output as JSON")
+  .action(graphCommand);
+
+program
+  .command("log [subcommand] [description]")
+  .description("View or write agent action log")
+  .option("--json", "Output as JSON")
+  .option("--agent <name>", "Agent name")
+  .option("--action <action>", "Action taken")
+  .option("--reason <reason>", "Why the action was taken")
+  .action(logCommand);
+
+program
+  .command("override <subcommand> [args...]")
+  .description("Manage priority overrides (add, remove, boost, list, clear)")
+  .option("--priority <level>", "Priority: now or today")
+  .option("--expires <date>", "Expiration date (YYYY-MM-DD)")
+  .option("--reason <reason>", "Reason for override")
+  .action(overrideCommand);
+
+program
+  .command("migrate")
+  .description("Migrate .brief/ files to current schema version")
+  .action(migrateCommand);
 
 program
   .command("urgent <message>")

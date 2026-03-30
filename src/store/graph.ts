@@ -34,7 +34,16 @@ export function loadGraph(base?: string): GraphLink[] {
 
 export function saveGraph(links: GraphLink[], base?: string): void {
   const path = getGraphPath(base);
-  const lines = ["# Relationships", ""];
+  const lines = [
+    "---",
+    "brief_version: 1",
+    `updated: ${new Date().toISOString()}`,
+    "sources: [manual]",
+    "---",
+    "",
+    "# Relationships",
+    "",
+  ];
   for (const link of links) {
     lines.push(`- ${link.from} ${link.type} ${link.to} (${link.added})`);
   }

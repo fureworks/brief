@@ -23,7 +23,15 @@ brief read priorities          # see what sync produced
 
 ### 2. Gather context sources
 
-Read these (adjust paths to your setup):
+After sync, all source content is available in `.brief/`. Read the synced files first — they contain KB and pipeline data pulled by directory sources:
+
+```bash
+brief read priorities          # scope items + KB items (raw, not cross-referenced)
+brief read decisions           # meeting decisions
+brief read state/project-c     # project state if generated
+```
+
+Then read additional context directly if needed:
 
 ```bash
 # Knowledge base — product priorities, roadmap, delivery tracker

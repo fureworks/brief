@@ -20,6 +20,8 @@ import { logCommand } from "./cli/log.js";
 import { overrideCommand } from "./cli/override.js";
 import { migrateCommand } from "./cli/migrate.js";
 import { serveCommand } from "./cli/serve.js";
+import { enrichContextCommand } from "./cli/enrich-context.js";
+import { enrichDoneCommand } from "./cli/enrich-done.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -46,11 +48,13 @@ program
 program
   .command("check")
   .description("Hash-based change detection (for agents)")
+  .option("--enrichment", "Check if enrichment is stale (exit 5=stale, 0=current)")
   .action(checkCommand);
 
 program
   .command("read [file]")
   .description("Read a .brief/ file (or list all files)")
+  .option("--agent <name>", "Filter view for specific agent (from brief.toml [agents.*])")
   .action(readCommand);
 
 program
@@ -110,6 +114,17 @@ program
   .command("migrate")
   .description("Migrate .brief/ files to current schema version")
   .action(migrateCommand);
+
+program
+  .command("enrich-context")
+  .description("Output all context needed for enrichment (files + GitHub + rules)")
+  .option("--json", "Output as JSON")
+  .action(enrichContextCommand);
+
+program
+  .command("enrich-done")
+  .description("Mark enrichment as complete (updates staleness tracking)")
+  .action(enrichDoneCommand);
 
 program
   .command("serve")

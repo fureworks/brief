@@ -360,6 +360,16 @@ export async function syncCommand(): Promise<void> {
   // Update hash
   writeHash(computeHash());
 
+  // Update enrichment state raw_hash (so enrichment staleness detection works)
+  try {
+    const { loadEnrichmentState, saveEnrichmentState, getRawHash } = await import("../store/enrichment.js");
+    const state = loadEnrichmentState();
+    if (state) {
+      state.raw_hash = await getRawHash();
+      saveEnrichmentState(state);
+    }
+  } catch { /* enrichment module not critical */ }
+
   const total = results.reduce((sum, r) => sum + r.items.length, 0);
   console.log(chalk.green(`\n  ✓ Brief synced. ${total} items from ${results.length} sources.`));
 

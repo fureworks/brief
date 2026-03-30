@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
@@ -27,6 +27,41 @@ async function runSource(source: BriefConfig["sources"][0]): Promise<SourceResul
       return { name: source.name, target: source.target, items: [{ raw: content }], duration: Date.now() - start };
     } catch (e: any) {
       return { name: source.name, target: source.target, items: [], error: e.message, duration: Date.now() - start };
+    }
+  }
+
+  if (source.type === "directory") {
+    try {
+      const dirPath = (source.path || "").replace(/^~/, process.env.HOME || "");
+      if (!existsSync(dirPath)) {
+        return { name: source.name, target: source.target, items: [], error: `Directory not found: ${dirPath}`, duration: Date.now() - start };
+      }
+
+      const items: unknown[] = [];
+      // If specific files listed, read only those
+      const filesToRead = (source as any).files as string[] | undefined;
+
+      if (filesToRead) {
+        for (const file of filesToRead) {
+          const filePath = join(dirPath, file);
+          if (existsSync(filePath)) {
+            const content = readFileSync(filePath, "utf-8");
+            items.push({ raw: content, file, source: source.name });
+          }
+        }
+      } else {
+        // Read all .md files in the directory (non-recursive)
+        for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+          if (entry.isFile() && entry.name.endsWith(".md")) {
+            const content = readFileSync(join(dirPath, entry.name), "utf-8");
+            items.push({ raw: content, file: entry.name, source: source.name });
+          }
+        }
+      }
+
+      return { name: source.name, target: source.target, items, duration: Date.now() - start };
+    } catch (e: any) {
+      return { name: source.name, target: source.target, items: [], error: e.message?.slice(0, 100), duration: Date.now() - start };
     }
   }
 
@@ -291,5 +326,24 @@ export async function syncCommand(): Promise<void> {
   writeHash(computeHash());
 
   const total = results.reduce((sum, r) => sum + r.items.length, 0);
-  console.log(chalk.green(`\n  ✓ Brief synced. ${total} items from ${results.length} sources.\n`));
+  console.log(chalk.green(`\n  ✓ Brief synced. ${total} items from ${results.length} sources.`));
+
+  // Run post_sync hook if configured
+  if (config.hooks?.post_sync) {
+    console.log(chalk.dim(`  Running post_sync hook...`));
+    try {
+      const { stdout, stderr } = await execAsync(config.hooks.post_sync, {
+        timeout: 60000,
+        encoding: "utf-8",
+        cwd: process.cwd(),
+      });
+      if (stdout.trim()) console.log(chalk.dim(`  ${stdout.trim()}`));
+      if (stderr.trim()) console.log(chalk.yellow(`  ${stderr.trim()}`));
+      console.log(chalk.green(`  ✓ Post-sync hook completed.`));
+    } catch (e: any) {
+      console.log(chalk.yellow(`  ⚠ Post-sync hook failed: ${e.message?.slice(0, 80)}`));
+    }
+  }
+
+  console.log("");
 }

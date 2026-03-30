@@ -19,6 +19,7 @@ import { graphCommand } from "./cli/graph.js";
 import { logCommand } from "./cli/log.js";
 import { overrideCommand } from "./cli/override.js";
 import { migrateCommand } from "./cli/migrate.js";
+import { serveCommand } from "./cli/serve.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -109,6 +110,13 @@ program
   .command("migrate")
   .description("Migrate .brief/ files to current schema version")
   .action(migrateCommand);
+
+program
+  .command("serve")
+  .description("Start local web viewer for .brief/ files")
+  .option("--port <port>", "Port number (default: 3030)")
+  .option("--render", "Just generate HTML, don't start server")
+  .action(serveCommand);
 
 program
   .command("urgent <message>")

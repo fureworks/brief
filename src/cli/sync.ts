@@ -37,7 +37,21 @@ async function runSource(source: BriefConfig["sources"][0]): Promise<SourceResul
         encoding: "utf-8",
       });
       const parsed = JSON.parse(stdout);
-      const items = Array.isArray(parsed) ? parsed : parsed.now ? [...(parsed.now || []), ...(parsed.today || [])] : [parsed];
+      let items = Array.isArray(parsed) ? parsed : parsed.now ? [...(parsed.now || []), ...(parsed.today || [])] : [parsed];
+
+      // Apply field mapping if configured
+      if (source.mapping) {
+        items = items.map((item: Record<string, unknown>) => {
+          const mapped: Record<string, unknown> = { ...item };
+          for (const [briefField, sourceField] of Object.entries(source.mapping!)) {
+            if (item[sourceField] !== undefined) {
+              mapped[briefField] = item[sourceField];
+            }
+          }
+          return mapped;
+        });
+      }
+
       return { name: source.name, target: source.target, items, duration: Date.now() - start };
     } catch (e: any) {
       return { name: source.name, target: source.target, items: [], error: e.message?.slice(0, 100), duration: Date.now() - start };

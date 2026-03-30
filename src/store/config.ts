@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 export interface BriefConfig {
   brief: { version: number; maintainer?: string; team_repo?: string };
-  sources: Array<{ name: string; type: string; command?: string; path?: string; target: string; priority: number; timeout?: number }>;
+  sources: Array<{ name: string; type: string; command?: string; path?: string; target: string; priority: number; timeout?: number; mapping?: Record<string, string> }>;
   notify: { enabled: boolean; telegram_bot_token?: string; telegram_chat_id?: string };
   health: { stale_threshold_hours: number; source_failure_threshold: number };
 }
@@ -55,7 +55,17 @@ export function loadConfig(base: string = process.cwd()): BriefConfig {
           const target = block.match(/target\s*=\s*"([^"]*)"/)?.[1] || "priorities";
           const priority = parseInt(block.match(/priority\s*=\s*(\d+)/)?.[1] || "0", 10);
           const timeout = parseInt(block.match(/timeout\s*=\s*(\d+)/)?.[1] || "15", 10);
-          config.sources.push({ name, type, command, path: srcPath, target, priority, timeout });
+          // Parse mapping if present
+          const mappingMatch = block.match(/mapping\s*=\s*\{([^}]*)\}/);
+          let mapping: Record<string, string> | undefined;
+          if (mappingMatch) {
+            mapping = {};
+            const pairs = mappingMatch[1].matchAll(/(\w+)\s*=\s*"([^"]*)"/g);
+            for (const pair of pairs) {
+              mapping[pair[1]] = pair[2];
+            }
+          }
+          config.sources.push({ name, type, command, path: srcPath, target, priority, timeout, mapping });
         }
 
         return config;

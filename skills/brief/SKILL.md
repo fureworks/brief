@@ -93,6 +93,18 @@ brief init --template startup
 brief sync
 ```
 
+## Enriching the Brief
+
+After `brief sync` pulls raw signals, enrich priorities.md with context from the knowledge base, pipeline, and meetings. This is what turns "PR is stale" into "PR is stale, blocks compliance, merge immediately."
+
+Read the full enrichment guide: `skills/brief/ENRICH.md`
+
+Short version:
+1. `brief sync` — pull raw signals
+2. Read KB, pipeline data, recent meeting decisions
+3. Rewrite priorities.md with cross-referenced context
+4. `brief validate` + `brief log write` + git commit
+
 ## Key Principles
 
 - **Check before every task** — `brief check` is cheap (<0.5s when nothing changed)

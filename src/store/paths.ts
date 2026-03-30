@@ -6,7 +6,9 @@ export function getBriefDir(base: string = process.cwd()): string {
 
 export const FILES = {
   priorities: "priorities.md",
+  prioritiesRaw: "priorities-raw.md",
   decisions: "decisions.md",
+  decisionsRaw: "decisions-raw.md",
   team: "team.md",
   overrides: "overrides.md",
   agentLog: "agent-log.md",

@@ -163,12 +163,39 @@ function renderPriorities(results: SourceResult[], config: BriefConfig): string 
     lines.push(`## IGNORED (${ignoredCount} items)`, "");
   }
 
-  // Check for remove overrides
+  // Apply boost overrides
+  const boostMatch = overrideContent.match(/## Boost\n([\s\S]*?)(?=\n##|$)/);
+  if (boostMatch) {
+    const boostLines = boostMatch[1].trim().split("\n").filter((l) => l.startsWith("- "));
+    for (const line of boostLines) {
+      const itemId = line.replace(/^- /, "").split("\n")[0].trim();
+      // Check if this item is in today or ignored, and boost to NOW
+      const boostedIdx = todayItems.findIndex((i) => i.includes(itemId));
+      if (boostedIdx >= 0) {
+        nowItems.push(todayItems[boostedIdx] + "\n  ⬆ Boosted via override");
+        todayItems.splice(boostedIdx, 1);
+      }
+    }
+  }
+
+  // Apply remove overrides
   const removeMatch = overrideContent.match(/## Remove\n([\s\S]*?)(?=\n##|$)/);
   if (removeMatch) {
-    const removeLines = removeMatch[1].trim().split("\n").filter((l) => l.startsWith("- "));
-    if (removeLines.length > 0) {
-      lines.push(`*${removeLines.length} items suppressed via overrides*`, "");
+    const removeIds = removeMatch[1].trim().split("\n")
+      .filter((l) => l.startsWith("- "))
+      .map((l) => l.replace(/^- /, "").split(/\s+#/)[0].trim());
+
+    const beforeNow = nowItems.length;
+    const beforeToday = todayItems.length;
+    for (const id of removeIds) {
+      const ni = nowItems.findIndex((i) => i.includes(id));
+      if (ni >= 0) nowItems.splice(ni, 1);
+      const ti = todayItems.findIndex((i) => i.includes(id));
+      if (ti >= 0) todayItems.splice(ti, 1);
+    }
+    const suppressed = (beforeNow - nowItems.length) + (beforeToday - todayItems.length);
+    if (suppressed > 0) {
+      lines.push(`*${suppressed} item${suppressed > 1 ? "s" : ""} suppressed via overrides*`, "");
     }
   }
 
@@ -301,12 +328,20 @@ export async function syncCommand(): Promise<void> {
     }
   }
 
-  // Render files
+  // Render to raw files (never overwrites enriched versions)
   const priorities = renderPriorities(results, config);
-  writeFileSync(join(briefDir, FILES.priorities), priorities);
+  writeFileSync(join(briefDir, FILES.prioritiesRaw), priorities);
 
   const decisions = renderDecisions(results);
-  writeFileSync(join(briefDir, FILES.decisions), decisions);
+  writeFileSync(join(briefDir, FILES.decisionsRaw), decisions);
+
+  // If priorities.md doesn't exist yet (first sync), copy raw as starting point
+  if (!existsSync(join(briefDir, FILES.priorities))) {
+    writeFileSync(join(briefDir, FILES.priorities), priorities);
+  }
+  if (!existsSync(join(briefDir, FILES.decisions))) {
+    writeFileSync(join(briefDir, FILES.decisions), decisions);
+  }
 
   // Render state files
   const stateDir = join(briefDir, DIRS.state);

@@ -94,12 +94,16 @@ export async function initCommand(options: InitOptions): Promise<void> {
   writeFileSync(join(briefDir, FILES.hash), "");
   writeFileSync(join(briefDir, FILES.sources), "");
 
-  console.log(chalk.green("  ✓ .brief/ initialized.\n"));
-
-  if (useTemplate) {
-    console.log(chalk.dim("  Template: startup (with example content)"));
-    console.log(chalk.dim("  Edit .brief/priorities.md to add your team's priorities.\n"));
+  // Create blank PRIORITIES-HUMAN.md template
+  const humanPriFile = join(briefDir, "PRIORITIES-HUMAN.md");
+  if (!existsSync(humanPriFile)) {
+    writeFileSync(humanPriFile, `# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: (not yet)\n\n## Product Priorities\n- P0: (run the interview — see rules/INTERVIEW.md)\n\n## Active Deals\n- (none yet)\n\n## Do NOT Work On\n- (none yet)\n\n## Blockers Needing Human Decision\n- (none yet)\n`);
   }
+
+  console.log(chalk.green("  ✓ .brief/ initialized.\n"));
+  console.log(chalk.yellow("  ⚠ Next: run the priority interview before fetching data."));
+  console.log(chalk.dim("  Read .brief/rules/INTERVIEW.md and update .brief/PRIORITIES-HUMAN.md"));
+  console.log(chalk.dim("  Then: read .brief/rules/SETUP.md to configure data sources.\n"));
 
   // Detect existing conventions
   if (options.detect !== false) {

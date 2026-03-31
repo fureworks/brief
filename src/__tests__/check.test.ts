@@ -11,11 +11,17 @@ function makeTestDir(name: string): string {
   return dir;
 }
 
+function fillInterview(dir: string): void {
+  const file = join(dir, ".brief/PRIORITIES-HUMAN.md");
+  writeFileSync(file, "# Human Priorities\n\nLast reviewed: 2026-03-31\nReviewer: test\n\n## Product Priorities\n- P0: Test\n");
+}
+
 describe("brief check", () => {
   it("returns exit 0 on no changes", () => {
     const dir = makeTestDir("ok");
     try {
       execSync(`node ${CLI} init --template startup`, { cwd: dir });
+      fillInterview(dir);
       // First check sets hash
       try { execSync(`node ${CLI} check`, { cwd: dir }); } catch {}
       // Second check: no changes
@@ -30,6 +36,7 @@ describe("brief check", () => {
     const dir = makeTestDir("changed");
     try {
       execSync(`node ${CLI} init --template startup`, { cwd: dir });
+      fillInterview(dir);
       // Set baseline
       try { execSync(`node ${CLI} check`, { cwd: dir }); } catch {}
       // Second check sets baseline
@@ -53,6 +60,7 @@ describe("brief check", () => {
     const dir = makeTestDir("urgent");
     try {
       execSync(`node ${CLI} init --template startup`, { cwd: dir });
+      fillInterview(dir);
       // Manually add urgent section to priorities.md
       const priFile = join(dir, ".brief/priorities.md");
       writeFileSync(priFile, readFileSync(priFile, "utf-8").replace("# Priorities", "# Priorities\n\n## 🔴 URGENT\n- Test urgent item"));

@@ -45,6 +45,19 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
     process.exit(0);
   }
 
+  // Check for missing PRIORITIES-HUMAN.md (interview not done)
+  const humanPriFile = join(briefDir, "PRIORITIES-HUMAN.md");
+  if (!existsSync(humanPriFile)) {
+    process.stdout.write("missing: no PRIORITIES-HUMAN.md — run the interview first (rules/INTERVIEW.md)\n");
+    process.exit(6);
+  }
+  // Check if interview is stale (>7 days)
+  const humanContent = readFileSync(humanPriFile, "utf-8");
+  if (humanContent.includes("Last reviewed: (not yet)")) {
+    process.stdout.write("missing: PRIORITIES-HUMAN.md not filled in — run the interview (rules/INTERVIEW.md)\n");
+    process.exit(6);
+  }
+
   // Normal mode: file change detection
   const currentHash = computeHash();
   const storedHash = readStoredHash();

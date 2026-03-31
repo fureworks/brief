@@ -1,86 +1,76 @@
 ---
 name: brief
-description: "Use the Brief convention + CLI for team working memory. Brief provides rules (markdown files) that describe HOW to build and maintain team context. Use when: (1) starting any task — check the brief first, (2) building daily priorities from multiple sources, (3) logging decisions/assignments, (4) morning/evening workflow, (5) priority interviews. Rules in .brief/rules/ tell you exactly what to do. Requires `brief` CLI (`npm i -g @fureworks/brief`) for automation, but works without it."
+description: "Team working memory convention. A .brief/ directory with markdown files for priorities, decisions, assignments, and rules that describe HOW to build context. Use when: (1) starting any task — read .brief/PRIORITIES.md first, (2) building daily priorities — follow .brief/rules/BUILD.md, (3) morning/evening workflow — follow rules/MORNING.md or EVENING.md. CLI has 3 commands: brief init, brief fetch, brief check. Everything else is reading/writing markdown files."
 ---
 
 # Brief — Team Working Memory
 
-Brief provides dynamic team context via `.brief/` directory files. The `rules/` directory tells agents HOW to build and maintain the brief.
+`.brief/` directory with markdown files. Rules tell you what to do. CLI is minimal.
 
-## Daily Workflow
-
-### Morning
-```bash
-brief fetch                        # pull data from sources → .brief/raw/
-brief check --enrichment           # exit 5 = stale, 0 = current
-# If stale:
-brief build                        # outputs BUILD.md rules + raw data
-# Follow the rules to write .brief/PRIORITIES.md
-brief enrich-done                  # mark enrichment complete
-# Then:
-brief read priorities              # your context for the day
-```
-
-Or read the rules directly: `cat .brief/rules/MORNING.md`
-
-### Evening
-```bash
-brief evening                      # outputs evening workflow rules
-# Log what you did:
-brief log write "description" --agent $BRIEF_AGENT_NAME --action "what was done"
-brief decision "any decisions made today"
-```
-
-Or read: `cat .brief/rules/EVENING.md`
-
-### Weekly
-```bash
-brief interview                    # outputs priority questions for human review
-```
-
-## Reading Context
+## Before Every Task
 
 ```bash
-brief read priorities              # what matters now
-brief read priorities --agent NAME # filtered view for specific agent
-brief read decisions               # recent decisions
-brief read people/alice            # assignments
-brief check                        # 0=ok, 1=changed, 2=urgent, 3=no brief
-brief check --enrichment           # 0=current, 5=stale
+brief check
+# exit 0: no changes, proceed
+# exit 1: files changed — read .brief/PRIORITIES.md
+# exit 2: urgent — read .brief/PRIORITIES.md immediately
 ```
 
-## Writing Context
+Or just: `cat .brief/PRIORITIES.md`
+
+## Morning
 
 ```bash
-brief decision "switched to JWT"
-brief assign alice "project-c-compliance"
-brief urgent "deadline moved" --expires 2026-04-04
-brief override add/remove/boost
-brief graph add blocks item-a item-b
-brief log write "description" --agent NAME --action "what"
+brief fetch                         # pull source data → .brief/raw/
+brief check --enrichment            # exit 5 = stale
+# If stale: read .brief/rules/BUILD.md, follow it
+# Read .brief/raw/* for source data
+# Write enriched .brief/PRIORITIES.md
 ```
+
+Or read `.brief/rules/MORNING.md` and follow the steps.
+
+## During Work
+
+All file operations — no CLI needed:
+
+```bash
+# Log a decision
+echo "- **Switched to JWT** ($(date -Iseconds))" >> .brief/DECISIONS.md
+
+# Assign work
+# Edit .brief/PEOPLE.md
+
+# Log agent action
+echo "- $(date -Iseconds) | $BRIEF_AGENT_NAME | action description" >> .brief/LOG.md
+
+# Track relationship
+echo "- issue:repo#45 blocks pr:repo#62 ($(date +%Y-%m-%d))" >> .brief/GRAPH.md
+
+# Add urgent item
+# Prepend to .brief/PRIORITIES.md
+```
+
+## Evening
+
+Read `.brief/rules/EVENING.md` and follow the steps.
 
 ## Rules Directory
 
-`.brief/rules/` contains markdown files that describe HOW to build the brief:
+| File | When to read |
+|------|-------------|
+| `rules/FETCH.md` | Setting up data sources |
+| `rules/BUILD.md` | Building PRIORITIES.md from raw data |
+| `rules/INTERVIEW.md` | Weekly priority review with human |
+| `rules/MORNING.md` | Start of day |
+| `rules/EVENING.md` | End of day |
 
-| File | Purpose |
-|------|---------|
-| FETCH.md | What data to fetch and how |
-| BUILD.md | How to combine raw data into PRIORITIES.md |
-| INTERVIEW.md | Priority questions for human review |
-| MORNING.md | Start-of-day workflow |
-| EVENING.md | End-of-day workflow |
+The rules ARE the convention. Read them, follow them.
 
-Read the relevant rule file, follow its instructions. The rules ARE the convention.
+## CLI (3 commands only)
 
-## Enrichment
-
-After `brief fetch` pulls raw data, read `rules/BUILD.md` and follow it to write an enriched PRIORITIES.md. See `skills/brief/ENRICH.md` for the full guide.
-
-## Key Principles
-
-- **Check before every task** — `brief check` is cheap
-- **Rules are the convention** — `rules/*.md` tell you what to do
-- **Context, not commands** — brief informs, doesn't direct
-- **Log your actions** — `brief log write` for audit trail
+```bash
+brief init          # create .brief/ with rules templates
+brief fetch         # pull configured sources → raw/
+brief check         # change detection (exit codes for automation)
+```

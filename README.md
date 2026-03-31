@@ -2,70 +2,88 @@
 
 **Team working memory for AI agents and humans.**
 
-Brief is an open convention for sharing dynamic context across a team. A \`.brief/\` directory of markdown files — including rules that describe HOW to build and maintain the brief — gives any AI coding tool and any human the context they need.
-
-The convention is the product. The CLI is optional.
+A `.brief/` directory of markdown files that any AI tool reads for context. Rules files describe HOW to build and maintain the brief. The convention is the product.
 
 ## Quick Start
 
-### Without CLI (just the convention)
-
-Create a \`.brief/\` directory in your project or team repo:
-
-\`\`\`
-.brief/
-├── PRIORITIES.md      # What matters now
-├── DECISIONS.md       # Recent decisions
-├── PEOPLE.md          # Who's doing what
-├── rules/             # HOW to build the brief
-│   ├── FETCH.md       # What data to fetch
-│   ├── BUILD.md       # How to combine into priorities
-│   ├── INTERVIEW.md   # Priority questions for human review
-│   ├── MORNING.md     # Start-of-day workflow
-│   └── EVENING.md     # End-of-day workflow
-└── raw/               # Fetched source data
-\`\`\`
-
-Any AI tool reads these files. Agents follow the rules in \`rules/\` to build and maintain the brief.
-
-### With CLI
-
-\`\`\`bash
+```bash
 npm install -g @fureworks/brief
-brief init --template startup    # creates .brief/ with rules templates
-brief fetch                      # pull data from configured sources
-brief build                      # output rules + data for agent to build PRIORITIES.md
-brief morning                    # start-of-day workflow
-brief evening                    # end-of-day workflow
-\`\`\`
+brief init --template startup
+```
 
-## How It Works
+This creates:
 
-1. **Fetch** — pull data from your tools (Scope, GitHub, KB, meetings)
-2. **Build** — agent reads BUILD.md rules + raw data → writes PRIORITIES.md
-3. **Read** — any tool reads PRIORITIES.md for context before working
-4. **Update** — log decisions, assignments, relationships throughout the day
-5. **Review** — evening workflow captures what got done
+```
+.brief/
+├── PRIORITIES.md       # What matters now (agent writes this)
+├── DECISIONS.md        # Recent decisions
+├── PEOPLE.md           # Who's doing what
+├── OVERRIDES.md        # Manual priority adjustments
+├── GRAPH.md            # Relationships between items
+├── LOG.md              # Agent audit trail
+├── rules/              # HOW to build the brief
+│   ├── FETCH.md        # What data to fetch
+│   ├── BUILD.md        # How to combine into priorities
+│   ├── INTERVIEW.md    # Priority questions for humans
+│   ├── MORNING.md      # Start-of-day workflow
+│   └── EVENING.md      # End-of-day workflow
+└── raw/                # Fetched source data
+```
 
-The CLI doesn't do the thinking. It provides the rules and data. The agent does the thinking.
+## The CLI (3 commands)
 
-## Commands (23)
+```bash
+brief init              # create .brief/ with rules templates
+brief fetch             # pull data from sources → raw/
+brief check             # exit 0=ok, 1=changed, 2=urgent, 5=enrichment stale
+```
 
-| Category | Commands |
-|----------|---------|
-| **Workflow** | \`fetch\`, \`build\`, \`morning\`, \`evening\`, \`interview\` |
-| **Read** | \`read\`, \`check\`, \`status\`, \`snippet\` |
-| **Write** | \`urgent\`, \`assign\`, \`decision\`, \`override\`, \`graph\`, \`log\` |
-| **Enrichment** | \`enrich-context\`, \`enrich-done\`, \`check --enrichment\` |
-| **Setup** | \`init\`, \`validate\`, \`doctor\`, \`serve\`, \`migrate\`, \`sync\` |
+That's it. Everything else is the convention — markdown files that agents read and follow.
+
+## The Convention (everything else)
+
+Agents already know how to read files, edit files, and run commands. They don't need a CLI for that.
+
+| Action | How |
+|--------|-----|
+| Read priorities | `cat .brief/PRIORITIES.md` |
+| Morning workflow | Read `.brief/rules/MORNING.md`, follow the steps |
+| Build priorities | Read `.brief/rules/BUILD.md` + `.brief/raw/*`, write PRIORITIES.md |
+| Evening review | Read `.brief/rules/EVENING.md`, follow the steps |
+| Priority interview | Read `.brief/rules/INTERVIEW.md`, ask the questions |
+| Log a decision | Append to `.brief/DECISIONS.md` |
+| Assign work | Edit `.brief/PEOPLE.md` |
+| Add urgent item | Prepend to `.brief/PRIORITIES.md` |
+| Log agent action | Append to `.brief/LOG.md` |
+| Track relationships | Edit `.brief/GRAPH.md` |
+| Override priorities | Edit `.brief/OVERRIDES.md` |
+
+## Daily Flow
+
+**Weekly (human, 15 min):**
+Review `.brief/rules/INTERVIEW.md` questions. Update product priorities.
+
+**Morning (agent):**
+```bash
+brief fetch                          # get fresh data
+brief check --enrichment             # stale? 
+# If exit 5: read rules/BUILD.md + raw/ → write PRIORITIES.md
+cat .brief/PRIORITIES.md             # context for the day
+```
+
+**During work:**
+Edit DECISIONS.md, PEOPLE.md, GRAPH.md, LOG.md as things happen.
+
+**Evening (agent):**
+Read `.brief/rules/EVENING.md`. Log what was done. Commit.
 
 ## Principles
 
-1. **Convention first.** The \`.brief/\` directory IS the product. The CLI is optional.
-2. **Rules in markdown.** \`rules/\` files describe HOW to build context. Agents follow them.
-3. **Agent does the thinking.** The CLI fetches data and outputs rules. The agent enriches.
-4. **Context, not commands.** Brief informs decisions. It doesn't direct actions.
-5. **Tool-agnostic.** Works with Claude Code, Codex, Cursor, or any tool that reads files.
+1. **Convention first.** The `.brief/` directory IS the product.
+2. **3 commands.** init, fetch, check. Everything else is files.
+3. **Rules in markdown.** Agents read rules/ and follow them.
+4. **Agent does the thinking.** CLI fetches data. Agent enriches.
+5. **Tool-agnostic.** Works with any tool that reads files.
 
 ## Spec
 

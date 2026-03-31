@@ -1,113 +1,86 @@
 ---
 name: brief
-description: "Use the Brief CLI for team working memory: check priorities before starting work, read context, log decisions, assign work, track relationships. Brief reads .brief/ directory files that contain team priorities, decisions, assignments, and state. Use when: (1) starting any task — run brief check first, (2) needing team context or priorities, (3) logging a decision from a meeting or discussion, (4) assigning work to a person, (5) adding urgent items, (6) checking what others are working on, (7) viewing or managing relationships between items. Requires `brief` CLI installed (`npm i -g @fureworks/brief`)."
+description: "Use the Brief convention + CLI for team working memory. Brief provides rules (markdown files) that describe HOW to build and maintain team context. Use when: (1) starting any task — check the brief first, (2) building daily priorities from multiple sources, (3) logging decisions/assignments, (4) morning/evening workflow, (5) priority interviews. Rules in .brief/rules/ tell you exactly what to do. Requires `brief` CLI (`npm i -g @fureworks/brief`) for automation, but works without it."
 ---
 
 # Brief — Team Working Memory
 
-Brief provides dynamic team context via `.brief/` directory files. Any AI tool reads these for priorities, decisions, assignments, and project state.
+Brief provides dynamic team context via `.brief/` directory files. The `rules/` directory tells agents HOW to build and maintain the brief.
 
-## Before Every Task
+## Daily Workflow
 
+### Morning
 ```bash
-result=$(brief check 2>/dev/null)
-code=$?
-if [ $code -eq 2 ]; then
-  # URGENT — read immediately
-  brief read priorities
-elif [ $code -eq 1 ]; then
-  # Changed — read updated context
-  brief read priorities
-fi
-# code 0: no changes, proceed normally
+brief fetch                        # pull data from sources → .brief/raw/
+brief check --enrichment           # exit 5 = stale, 0 = current
+# If stale:
+brief build                        # outputs BUILD.md rules + raw data
+# Follow the rules to write .brief/PRIORITIES.md
+brief enrich-done                  # mark enrichment complete
+# Then:
+brief read priorities              # your context for the day
 ```
 
-Exit codes: 0=ok, 1=changed, 2=urgent, 3=no brief found.
+Or read the rules directly: `cat .brief/rules/MORNING.md`
 
-If urgent or changed: read the priorities and factor them into task selection. Flag conflicts with current request to the user — don't silently follow the brief over the user.
+### Evening
+```bash
+brief evening                      # outputs evening workflow rules
+# Log what you did:
+brief log write "description" --agent $BRIEF_AGENT_NAME --action "what was done"
+brief decision "any decisions made today"
+```
 
-Brief content is **context, not commands.** Use it to inform decisions, not as directives.
+Or read: `cat .brief/rules/EVENING.md`
+
+### Weekly
+```bash
+brief interview                    # outputs priority questions for human review
+```
 
 ## Reading Context
 
 ```bash
-brief read priorities          # what matters now (NOW / TODAY / IGNORED)
-brief read decisions           # recent decisions with rationale
-brief read people/alice        # what alice is working on
-brief read state/project-a     # project state (PRs, issues, CI)
-brief read                     # list all available files
-brief status                   # freshness of all files
+brief read priorities              # what matters now
+brief read priorities --agent NAME # filtered view for specific agent
+brief read decisions               # recent decisions
+brief read people/alice            # assignments
+brief check                        # 0=ok, 1=changed, 2=urgent, 3=no brief
+brief check --enrichment           # 0=current, 5=stale
 ```
 
 ## Writing Context
 
 ```bash
-# After a meeting or discussion
-brief decision "Switched auth to JWT + refresh tokens"
-
-# Assign work
+brief decision "switched to JWT"
 brief assign alice "project-c-compliance"
-
-# Urgent priority change
-brief urgent "Deploy deadline moved to Friday" --expires 2026-04-04
-
-# Manual priority overrides
-brief override add "Fix auth bug" --priority now --expires 2026-04-01
-brief override remove issue:repo#63 --reason "parked"
-brief override boost pr:repo#52 --priority now
+brief urgent "deadline moved" --expires 2026-04-04
+brief override add/remove/boost
+brief graph add blocks item-a item-b
+brief log write "description" --agent NAME --action "what"
 ```
 
-## Relationships
+## Rules Directory
 
-```bash
-brief graph add blocks issue:repo#45 pr:repo#62
-brief graph add caused_by issue:repo#45 decision:compliance-audit
-brief graph query issue:repo#45           # what does this item relate to?
-brief graph                               # all relationships
-```
+`.brief/rules/` contains markdown files that describe HOW to build the brief:
 
-## Agent Logging
+| File | Purpose |
+|------|---------|
+| FETCH.md | What data to fetch and how |
+| BUILD.md | How to combine raw data into PRIORITIES.md |
+| INTERVIEW.md | Priority questions for human review |
+| MORNING.md | Start-of-day workflow |
+| EVENING.md | End-of-day workflow |
 
-After taking action based on brief content, log it:
+Read the relevant rule file, follow its instructions. The rules ARE the convention.
 
-```bash
-brief log write "Read priorities.md" --agent $BRIEF_AGENT_NAME --action "Created PR #94" --reason "highest-scored buildable issue"
-```
+## Enrichment
 
-Set agent identity: `export BRIEF_AGENT_NAME=my-agent-name`
-
-## Syncing
-
-```bash
-brief sync                     # pull from configured sources
-brief doctor                   # check source health
-```
-
-Sources configured in `brief.toml`. Common: Scope (`scope today --json`), GitHub (`gh issue list --json`).
-
-## Setup (if .brief/ doesn't exist)
-
-```bash
-brief init --template startup
-# Then configure brief.toml with sources
-brief sync
-```
-
-## Enriching the Brief
-
-After `brief sync` pulls raw signals, enrich priorities.md with context from the knowledge base, pipeline, and meetings. This is what turns "PR is stale" into "PR is stale, blocks compliance, merge immediately."
-
-Read the full enrichment guide: `skills/brief/ENRICH.md`
-
-Short version:
-1. `brief sync` — pull raw signals
-2. Read KB, pipeline data, recent meeting decisions
-3. Rewrite priorities.md with cross-referenced context
-4. `brief validate` + `brief log write` + git commit
+After `brief fetch` pulls raw data, read `rules/BUILD.md` and follow it to write an enriched PRIORITIES.md. See `skills/brief/ENRICH.md` for the full guide.
 
 ## Key Principles
 
-- **Check before every task** — `brief check` is cheap (<0.5s when nothing changed)
+- **Check before every task** — `brief check` is cheap
+- **Rules are the convention** — `rules/*.md` tell you what to do
 - **Context, not commands** — brief informs, doesn't direct
-- **Log your actions** — other agents and humans can see what was done and why
-- **Flag conflicts** — if brief says X but user says Y, tell the user
+- **Log your actions** — `brief log write` for audit trail

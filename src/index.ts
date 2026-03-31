@@ -22,6 +22,8 @@ import { migrateCommand } from "./cli/migrate.js";
 import { serveCommand } from "./cli/serve.js";
 import { enrichContextCommand } from "./cli/enrich-context.js";
 import { enrichDoneCommand } from "./cli/enrich-done.js";
+import { fetchCommand } from "./cli/fetch.js";
+import { buildCommand, morningCommand, eveningCommand, interviewCommand } from "./cli/workflow.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -66,6 +68,31 @@ program
   .command("snippet [tool]")
   .description("Generate integration snippet for AI tools (claude, codex, cursor, openclaw)")
   .action(snippetCommand);
+
+program
+  .command("fetch")
+  .description("Fetch data from all configured sources into .brief/raw/")
+  .action(fetchCommand);
+
+program
+  .command("build")
+  .description("Output BUILD.md rules + raw data for agent to build PRIORITIES.md")
+  .action(buildCommand);
+
+program
+  .command("morning")
+  .description("Output morning workflow rules")
+  .action(morningCommand);
+
+program
+  .command("evening")
+  .description("Output evening workflow rules")
+  .action(eveningCommand);
+
+program
+  .command("interview")
+  .description("Output priority interview questions for human review")
+  .action(interviewCommand);
 
 program
   .command("sync")

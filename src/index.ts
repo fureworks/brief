@@ -8,10 +8,10 @@ import { initCommand } from "./cli/init.js";
 import { validateCommand } from "./cli/validate.js";
 import { checkCommand } from "./cli/check.js";
 import { readCommand } from "./cli/read.js";
-import { statusCommand } from "./cli/status.js";
+// status merged into doctor
 import { snippetCommand } from "./cli/snippet.js";
 import { urgentCommand } from "./cli/urgent.js";
-import { syncCommand } from "./cli/sync.js";
+// sync replaced by fetch
 import { doctorCommand } from "./cli/doctor.js";
 import { assignCommand } from "./cli/assign.js";
 import { decisionCommand } from "./cli/decision.js";
@@ -20,7 +20,6 @@ import { logCommand } from "./cli/log.js";
 import { overrideCommand } from "./cli/override.js";
 import { migrateCommand } from "./cli/migrate.js";
 import { serveCommand } from "./cli/serve.js";
-import { enrichContextCommand } from "./cli/enrich-context.js";
 import { enrichDoneCommand } from "./cli/enrich-done.js";
 import { fetchCommand } from "./cli/fetch.js";
 import { buildCommand, morningCommand, eveningCommand, interviewCommand } from "./cli/workflow.js";
@@ -59,10 +58,7 @@ program
   .option("--agent <name>", "Filter view for specific agent (from brief.toml [agents.*])")
   .action(readCommand);
 
-program
-  .command("status")
-  .description("Show freshness of all .brief/ files")
-  .action(statusCommand);
+// status merged into doctor
 
 program
   .command("snippet [tool]")
@@ -93,11 +89,6 @@ program
   .command("interview")
   .description("Output priority interview questions for human review")
   .action(interviewCommand);
-
-program
-  .command("sync")
-  .description("Pull from configured sources and regenerate .brief/ files")
-  .action(syncCommand);
 
 program
   .command("doctor")
@@ -141,12 +132,6 @@ program
   .command("migrate")
   .description("Migrate .brief/ files to current schema version")
   .action(migrateCommand);
-
-program
-  .command("enrich-context")
-  .description("Output all context needed for enrichment (files + GitHub + rules)")
-  .option("--json", "Output as JSON")
-  .action(enrichContextCommand);
 
 program
   .command("enrich-done")

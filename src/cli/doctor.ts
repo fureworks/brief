@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { getBriefDir, FILES } from "../store/paths.js";
@@ -65,6 +65,36 @@ export async function doctorCommand(): Promise<void> {
   } else {
     console.log(chalk.dim("\n  No sync history. Run 'brief sync' to populate."));
   }
+
+  // File freshness
+  console.log("");
+  console.log(chalk.bold("  Files"));
+  console.log(chalk.dim("  ─────"));
+
+  function showFiles(dir: string, prefix: string = "") {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".md") && !entry.name.startsWith(".")) {
+        const filePath = join(dir, entry.name);
+        const content = readFileSync(filePath, "utf-8");
+        const fmMatch = content.match(/updated:\s*(.+)/);
+        let ageStr = "unknown";
+        let indicator = chalk.dim("?");
+        if (fmMatch) {
+          const age = Date.now() - new Date(fmMatch[1]).getTime();
+          ageStr = age < 3600000 ? `${Math.round(age / 60000)}m ago` :
+                   age < 86400000 ? `${Math.round(age / 3600000)}h ago` :
+                   `${Math.round(age / 86400000)}d ago`;
+          indicator = age > config.health.stale_threshold_hours * 3600000 ? chalk.yellow("⚠️") : chalk.green("✅");
+        }
+        console.log(`  ${indicator} ${(prefix + entry.name).padEnd(25)} ${chalk.dim(ageStr)}`);
+      }
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        showFiles(join(dir, entry.name), entry.name + "/");
+      }
+    }
+  }
+  showFiles(briefDir);
 
   // Check notifications
   console.log("");

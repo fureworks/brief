@@ -1,13 +1,13 @@
 {
   "name": "@fureworks/brief",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Team working memory for AI agents and humans.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/templates dist/",
     "test": "vitest run",
     "prepublishOnly": "npm run build"
   },
@@ -40,6 +40,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "src/templates"
   ]
 }

@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { getBriefDir, FILES, DIRS } from "../store/paths.js";
 import { makeFrontmatter } from "../store/frontmatter.js";
@@ -61,6 +62,24 @@ export async function initCommand(options: InitOptions): Promise<void> {
   mkdirSync(briefDir, { recursive: true });
   mkdirSync(join(briefDir, DIRS.state), { recursive: true });
   mkdirSync(join(briefDir, DIRS.people), { recursive: true });
+  mkdirSync(join(briefDir, "rules"), { recursive: true });
+  mkdirSync(join(briefDir, "raw"), { recursive: true });
+
+  // Copy rules templates — check both dist and src paths
+  let templatesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "templates", "rules");
+  if (!existsSync(templatesDir)) {
+    // Fallback to src/templates when running from dist/
+    templatesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "templates", "rules");
+  }
+  if (existsSync(templatesDir)) {
+    for (const file of readdirSync(templatesDir)) {
+      const src = join(templatesDir, file);
+      const dest = join(briefDir, "rules", file);
+      if (!existsSync(dest)) {
+        writeFileSync(dest, readFileSync(src, "utf-8"));
+      }
+    }
+  }
 
   const fm = makeFrontmatter();
   const useTemplate = options.template === "startup";

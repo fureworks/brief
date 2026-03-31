@@ -1,27 +1,14 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { getBriefDir } from "../store/paths.js";
 import { computeHash, readStoredHash, writeHash, hasUrgent } from "../store/hash.js";
-import { isEnrichmentStale } from "../store/enrichment.js";
 
 interface CheckOptions {
   enrichment?: boolean;
 }
 
 export async function checkCommand(options: CheckOptions): Promise<void> {
-  // Enrichment mode: separate exit codes
-  if (options.enrichment) {
-    const briefDir = getBriefDir();
-    if (!existsSync(briefDir)) {
-      process.stdout.write("error: no brief found\n");
-      process.exit(3);
-    }
-    if (await isEnrichmentStale()) {
-      process.stdout.write("stale: enrichment needs update\n");
-      process.exit(5);
-    }
-    process.stdout.write("ok: enrichment current\n");
-    process.exit(0);
-  }
   const briefDir = getBriefDir();
 
   if (!existsSync(briefDir)) {
@@ -29,18 +16,46 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
     process.exit(3);
   }
 
+  // Enrichment mode: is PRIORITIES.md stale relative to raw/?
+  if (options.enrichment) {
+    const priFile = join(briefDir, "priorities.md");
+    const rawFile = join(briefDir, "priorities-raw.md");
+
+    if (!existsSync(rawFile)) {
+      process.stdout.write("stale: no raw data — run brief fetch\n");
+      process.exit(5);
+    }
+
+    if (!existsSync(priFile)) {
+      process.stdout.write("stale: no priorities — build needed\n");
+      process.exit(5);
+    }
+
+    // Compare raw file mtime vs priorities mtime
+    const { statSync } = await import("node:fs");
+    const rawMtime = statSync(rawFile).mtimeMs;
+    const priMtime = statSync(priFile).mtimeMs;
+
+    if (rawMtime > priMtime) {
+      process.stdout.write("stale: raw data newer than priorities\n");
+      process.exit(5);
+    }
+
+    process.stdout.write("ok: enrichment current\n");
+    process.exit(0);
+  }
+
+  // Normal mode: file change detection
   const currentHash = computeHash();
   const storedHash = readStoredHash();
 
   if (storedHash === null) {
-    // First check — store current hash
     writeHash(currentHash);
     process.stdout.write("ok\n");
     process.exit(0);
   }
 
   if (currentHash === storedHash) {
-    // Even if hash matches, check for urgent flag
     if (hasUrgent()) {
       process.stdout.write("urgent: priorities\n");
       process.exit(2);
@@ -49,7 +64,6 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
     process.exit(0);
   }
 
-  // Changed — update stored hash
   writeHash(currentHash);
 
   if (hasUrgent()) {
@@ -57,6 +71,6 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
     process.exit(2);
   }
 
-  process.stdout.write("changed: priorities decisions\n");
+  process.stdout.write("changed: priorities\n");
   process.exit(1);
 }

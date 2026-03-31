@@ -5,15 +5,18 @@ How to combine fetched data into PRIORITIES.md.
 ## Input
 
 Read all of these before building:
-- `.brief/raw/*.json` and `.brief/raw/*.md` — fetched data from sources
-- `.brief/OVERRIDES.md` — manual priority adjustments (add/remove/boost)
-- `.brief/GRAPH.md` — blocking relationships
-- Last interview notes (if available in `.brief/raw/interview-*.md`)
-- Previous `.brief/PRIORITIES.md` — preserve enrichment context where items haven't changed
+1. `.brief/PRIORITIES-HUMAN.md` — **START HERE.** Human-set product priorities (P0-P3), deal dependencies, what NOT to work on. This is the skeleton that everything else hangs on. If this file doesn't exist, run the interview first (see `rules/INTERVIEW.md`).
+2. `.brief/raw/*.json` and `.brief/raw/*.md` — fetched data from sources (scope signals, GitHub PRs, KB context)
+3. `.brief/OVERRIDES.md` — manual priority adjustments (add/remove/boost)
+4. `.brief/GRAPH.md` — blocking relationships between items
+5. Previous `.brief/PRIORITIES.md` — preserve enrichment context where items haven't changed
 
 ## Process
 
-1. **Start with interview priorities** as the skeleton (P0 → P3 products/items)
+1. **Start with PRIORITIES-HUMAN.md** as the skeleton. Human priorities define the ranking.
+   - P0 items always outrank P1, regardless of age or score
+   - "Do NOT work on" items are excluded from NOW/TODAY
+   - Deal dependencies add urgency context
 2. **Cross-reference against scope data** — add scores, staleness, blocking signals
 3. **Cross-reference against KB** — product priority, revenue targets, delivery dates
 4. **Cross-reference against GitHub** — merge readiness (APPROVED+MERGEABLE = merge-now)

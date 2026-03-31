@@ -1,56 +1,54 @@
 # Morning Workflow
 
-Start-of-day routine. Run this or follow these steps at the beginning of each work session.
+Start-of-day routine. Follow these steps.
 
 ## Steps
 
-### 1. Fetch fresh data
+### 1. Check if human priorities exist
+Read `.brief/PRIORITIES-HUMAN.md`.
+- If it doesn't exist: run the interview first (`rules/INTERVIEW.md`). You can't build a good brief without human input.
+- If it's older than 7 days: flag to the user: "Priority interview is overdue. Should we review priorities?"
+
+### 2. Fetch fresh data
 ```bash
 brief fetch
 ```
-Or manually run the commands in `.brief/rules/FETCH.md`.
 
-### 2. Check if brief needs rebuilding
+### 3. Check if brief needs rebuilding
 ```bash
 brief check --enrichment
 ```
-- Exit 0: brief is current. Skip to step 4.
-- Exit 5: brief is stale. Continue to step 3.
+- Exit 0: brief is current. Skip to step 5.
+- Exit 5: brief is stale. Continue to step 4.
 
-### 3. Build the brief
-Read `.brief/rules/BUILD.md` and follow the process.
-Read all files in `.brief/raw/` for source data.
-Write the enriched output to `.brief/PRIORITIES.md`.
+### 4. Build the brief
+Read `.brief/rules/BUILD.md` and follow the process:
+1. Start with PRIORITIES-HUMAN.md (human rankings)
+2. Cross-reference with `.brief/raw/*` (source data)
+3. Apply overrides and graph
+4. Write enriched `.brief/PRIORITIES.md`
 
+### 5. Read your priorities
+```
+cat .brief/PRIORITIES.md
+```
+Or for your filtered view, check if `[agents.yourname]` is in brief.toml and filter accordingly.
+
+### 6. Pick your first task
+Choose the top item from URGENT or NOW.
+If nothing in URGENT/NOW — work on TODAY items.
+
+### 7. Log that you're starting
 ```bash
-brief enrich-done
+echo "- $(date -Iseconds) | [agent-name] | Read PRIORITIES.md | Starting [task] | Reason: top priority" >> .brief/LOG.md
 ```
 
-### 4. Read your priorities
-```bash
-brief read priorities
-# Or for your filtered view:
-brief read priorities --agent [your-name]
-```
-
-### 5. Pick your first task
-Choose the top item from your priority tier.
-If nothing in URGENT or NOW — you have a good day, work on TODAY items.
-
-### 6. Log that you're starting
-```bash
-brief log write "Read priorities" --agent [name] --action "Starting [task description]"
-```
-
-## Quick version (for cron / automated agents)
+## Quick version (for cron)
 
 ```bash
 brief fetch
-result=$(brief check --enrichment 2>/dev/null); code=$?
-if [ $code -eq 5 ]; then
-  # Agent: read BUILD.md + raw/ → write PRIORITIES.md
-  brief enrich-done
-fi
-brief read priorities --agent [name]
+brief check --enrichment
+# If exit 5: follow BUILD.md → write PRIORITIES.md
+cat .brief/PRIORITIES.md
 # Work on item #1
 ```

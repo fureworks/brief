@@ -5,14 +5,48 @@ import { promisify } from "node:util";
 import chalk from "chalk";
 import { getBriefDir } from "../store/paths.js";
 import { loadConfig } from "../store/config.js";
+import { assessBriefHealth, formatHealthReport } from "../store/health.js";
 
 const execAsync = promisify(exec);
 
+function printHealthBanner(lines: string[], color: "yellow" | "red" = "yellow"): void {
+  const tint = color === "red" ? chalk.red : chalk.yellow;
+  console.log(tint(`  ${lines[0]}`));
+  for (const line of lines.slice(1)) {
+    console.log(tint(`  ${line}`));
+  }
+  console.log("");
+}
+
+function printNextSteps(): void {
+  console.log(chalk.dim("  Next: run 'brief check --enrichment'."));
+  console.log(chalk.dim("  If it reports stale, read .brief/rules/BUILD.md + .brief/raw/ and update .brief/priorities.md yourself.\n"));
+}
+
 export async function fetchCommand(): Promise<void> {
   const briefDir = getBriefDir();
+  const health = assessBriefHealth();
+
   if (!existsSync(briefDir)) {
-    console.log(chalk.red("  No .brief/ directory found. Run 'brief init' first.\n"));
+    printHealthBanner([...formatHealthReport(health), "- Run 'brief init --template startup' first."], "red");
     process.exit(3);
+  }
+
+  if (health.state === "legacy-schema") {
+    printHealthBanner([
+      ...formatHealthReport(health),
+      "- Continuing in legacy context mode. Do not treat this as full modern Brief steering.",
+    ]);
+  } else if (health.state === "misconfigured") {
+    printHealthBanner([
+      ...formatHealthReport(health),
+      "- Continuing with best-effort fetch, but the current schema is broken.",
+    ]);
+  } else if (health.state === "stale") {
+    printHealthBanner([
+      ...formatHealthReport(health),
+      "- Continuing fetch. You will still need to rebuild priorities from rules + raw afterward.",
+    ]);
   }
 
   const rawDir = join(briefDir, "raw");
@@ -24,7 +58,6 @@ export async function fetchCommand(): Promise<void> {
 
   console.log(chalk.dim("  Fetching data...\n"));
 
-  // Fetch from brief.toml sources
   for (const source of config.sources) {
     if (source.type === "command" && source.command) {
       try {
@@ -95,9 +128,8 @@ export async function fetchCommand(): Promise<void> {
     }
   }
 
-  // Run post_sync hook if configured
   if (config.hooks?.post_sync) {
-    console.log(chalk.dim(`\n  Running post-fetch hook...`));
+    console.log(chalk.dim("\n  Running post-fetch hook..."));
     try {
       const { stdout } = await execAsync(config.hooks.post_sync, {
         timeout: 60000,
@@ -110,5 +142,20 @@ export async function fetchCommand(): Promise<void> {
   }
 
   console.log(chalk.green(`\n  ✓ Fetched ${fetched} source${fetched !== 1 ? "s" : ""}${failed > 0 ? chalk.yellow(`, ${failed} failed`) : ""}.\n`));
-  console.log(chalk.dim("  Next: run 'brief build' to combine data into PRIORITIES.md\n"));
+
+  const postFetchHealth = assessBriefHealth();
+  if (postFetchHealth.state === "legacy-schema") {
+    console.log(chalk.yellow("  Next: use the fetched files as context only. This workspace is still legacy-shaped.\n"));
+    return;
+  }
+
+  if (postFetchHealth.state === "misconfigured") {
+    printHealthBanner([
+      ...formatHealthReport(postFetchHealth),
+      "- Fix the schema before trusting Brief as a steering layer.",
+    ]);
+    return;
+  }
+
+  printNextSteps();
 }

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getBriefDir } from "../store/paths.js";
 import { computeHash, readStoredHash, writeHash, hasUrgent } from "../store/hash.js";
-import { assessBriefHealth, exitCodeForHealth } from "../store/health.js";
+import { assessBriefHealth, exitCodeForHealth, formatHealthReport } from "../store/health.js";
 
 interface CheckOptions {
   enrichment?: boolean;
@@ -10,16 +10,24 @@ interface CheckOptions {
   json?: boolean;
 }
 
-function printHealth(options: CheckOptions, health = assessBriefHealth()): never {
+function outputHealth(options: CheckOptions, lines: string[], exitCode: number): never {
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify({ lines }, null, 2)}\n`);
+  } else {
+    process.stdout.write(`${lines.join("\n")}\n`);
+  }
+  process.exit(exitCode);
+}
+
+function printHealth(options: CheckOptions, nextSteps: string[] = []): never {
+  const health = assessBriefHealth();
   if (options.json) {
     process.stdout.write(`${JSON.stringify(health, null, 2)}\n`);
-  } else {
-    process.stdout.write(`health: ${health.state}\n`);
-    for (const reason of health.reasons) {
-      process.stdout.write(`- ${reason}\n`);
-    }
+    process.exit(exitCodeForHealth(health.state));
   }
-  process.exit(exitCodeForHealth(health.state));
+
+  const lines = [...formatHealthReport(health), ...nextSteps.map((step) => `- ${step}`)];
+  outputHealth(options, lines, exitCodeForHealth(health.state));
 }
 
 export async function checkCommand(options: CheckOptions): Promise<void> {
@@ -27,11 +35,45 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
   const health = assessBriefHealth();
 
   if (options.health) {
-    printHealth(options, health);
+    const nextSteps: string[] = [];
+    if (health.state === "missing") {
+      nextSteps.push("Run 'brief init --template startup'.");
+    }
+    if (health.state === "legacy-schema") {
+      nextSteps.push("Legacy context can still be fetched, but do not treat this as full modern Brief steering.");
+    }
+    if (health.state === "misconfigured") {
+      nextSteps.push("Fix the missing paths before trusting Brief.");
+    }
+    if (health.state === "stale") {
+      nextSteps.push("Read .brief/rules/BUILD.md + .brief/raw/ and update .brief/priorities.md yourself.");
+    }
+    const lines = [...formatHealthReport(health), ...nextSteps.map((step) => `- ${step}`)];
+    outputHealth(options, lines, exitCodeForHealth(health.state));
   }
 
-  if (health.state === "missing" || health.state === "legacy-schema" || health.state === "misconfigured") {
-    printHealth(options, health);
+  if (health.state === "missing") {
+    outputHealth(options, [...formatHealthReport(health), "- Run 'brief init --template startup'."], exitCodeForHealth(health.state));
+  }
+
+  if (health.state === "legacy-schema") {
+    outputHealth(
+      options,
+      [
+        ...formatHealthReport(health),
+        "- Legacy context is available, but current-schema rules are missing.",
+        "- Do not treat this as full modern Brief steering.",
+      ],
+      exitCodeForHealth(health.state)
+    );
+  }
+
+  if (health.state === "misconfigured") {
+    outputHealth(
+      options,
+      [...formatHealthReport(health), "- Fix the missing paths before trusting Brief."],
+      exitCodeForHealth(health.state)
+    );
   }
 
   if (!existsSync(briefDir)) {
@@ -41,7 +83,9 @@ export async function checkCommand(options: CheckOptions): Promise<void> {
 
   if (options.enrichment) {
     if (health.state === "stale") {
-      process.stdout.write(`stale: ${health.reasons.join(" ")}\n`);
+      process.stdout.write(
+        `stale: ${health.reasons.join(" ")} Read .brief/rules/BUILD.md + .brief/raw/ and update .brief/priorities.md yourself.\n`
+      );
       process.exit(5);
     }
 

@@ -65,11 +65,14 @@ Review `.brief/rules/INTERVIEW.md` questions. Update product priorities.
 
 **Morning (agent):**
 ```bash
+brief check --health                 # current schema, legacy, missing, broken?
 brief fetch                          # get fresh data
-brief check --enrichment             # stale? 
+brief check --enrichment             # stale?
 # If exit 5: read rules/BUILD.md + raw/ → write PRIORITIES.md
 cat .brief/PRIORITIES.md             # context for the day
 ```
+
+If `brief check --health` says `legacy-schema` or `misconfigured`, treat Brief as degraded context, not as a trusted steering layer.
 
 **During work:**
 Edit DECISIONS.md, PEOPLE.md, GRAPH.md, LOG.md as things happen.
@@ -83,7 +86,8 @@ Read `.brief/rules/EVENING.md`. Log what was done. Commit.
 2. **3 commands.** init, fetch, check. Everything else is files.
 3. **Rules in markdown.** Agents read rules/ and follow them.
 4. **Agent does the thinking.** CLI fetches data. Agent enriches.
-5. **Tool-agnostic.** Works with any tool that reads files.
+5. **Health before trust.** A successful command run does not automatically mean the workspace matches the current Brief schema.
+6. **Tool-agnostic.** Works with any tool that reads files.
 
 ## Spec
 

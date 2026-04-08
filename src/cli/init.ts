@@ -1,124 +1,101 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import chalk from "chalk";
-import { getBriefDir, FILES, DIRS } from "../store/paths.js";
-import { makeFrontmatter } from "../store/frontmatter.js";
+import { getBriefDir, getStartupSchemaManifest, DIRS, FILES } from "../store/paths.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function getTemplateDir(): string {
+  const distPath = join(__dirname, "..", "templates");
+  if (existsSync(distPath)) return distPath;
+  return join(__dirname, "..", "..", "src", "templates");
+}
+
+function buildSeedContent(relativePath: string, useTemplate: boolean, briefDir: string): string {
+  switch (relativePath) {
+    case FILES.priorities:
+      return useTemplate
+        ? `# Priorities\n\n## Now\n- [ ] Example urgent item\n\n## Next\n- [ ] Example next item\n\n## Waiting\n- [ ] Example blocked item\n`
+        : `# Priorities\n\n## Now\n\n## Next\n\n## Waiting\n`;
+    case FILES.prioritiesRaw:
+      return "# Raw Inputs\n\n<!-- fetched inputs go here -->\n";
+    case FILES.decisions:
+      return "# Decisions\n\n";
+    case FILES.decisionsRaw:
+      return "# Decision Inputs\n\n";
+    case FILES.team:
+      return useTemplate
+        ? `# Team\n\n## Roles\n- Founder: you\n- Agent: Brief-compatible AI\n`
+        : "# Team\n\n";
+    case FILES.overrides:
+      return "# Overrides\n\n";
+    case FILES.agentLog:
+      return "# Agent Log\n\n";
+    case FILES.hash:
+      return "";
+    case FILES.sources:
+      return existsSync(join(briefDir, FILES.sources)) ? readFileSync(join(briefDir, FILES.sources), "utf-8") : "[]\n";
+    case FILES.humanPriorities:
+      return useTemplate
+        ? `# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: \n\n## Product Priorities\n- P0: \n- P1: \n- P2: \n\n## Constraints\n- \n\n## This Week\n- \n`
+        : "# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: \n";
+    default:
+      throw new Error(`No seed content defined for ${relativePath}`);
+  }
+}
 
 interface InitOptions {
   template?: string;
-  detect?: boolean;
 }
-
-const STARTUP_PRIORITIES = `# Priorities
-
-## NOW
-- (Add your top priority items here)
-
-## TODAY
-- (Add items to fit in today)
-
-## IGNORED (0 items)
-`;
-
-const STARTUP_DECISIONS = `# Recent Decisions
-
-## ${new Date().toISOString().split("T")[0]}
-- (Log decisions from meetings and discussions here)
-`;
-
-const STARTUP_TEAM = `# Team
-
-| Name | Role | Focus |
-|------|------|-------|
-| (Add team members) | | |
-`;
-
-const STARTUP_OVERRIDES = `# Overrides
-# This is the only file you edit directly. The CLI reads it during sync.
-
-## Add
-# - Item to inject into priorities
-#   Reason: why
-#   Expires: YYYY-MM-DD
-
-## Remove
-# - issue:repo#N  # reason
-
-## Boost
-# - pr:repo#N
-#   Priority: now
-`;
 
 export async function initCommand(options: InitOptions): Promise<void> {
   const briefDir = getBriefDir();
+  const useTemplate = options.template === "startup";
+  const manifest = getStartupSchemaManifest();
 
   if (existsSync(briefDir)) {
-    console.log(chalk.yellow("  .brief/ already exists. Use brief validate to check integrity.\n"));
+    console.log("Brief already exists here.");
+    console.log(`Path: ${briefDir}`);
+    console.log("Run `brief check --health` to inspect the current workspace state.");
     return;
   }
 
-  // Create directories
   mkdirSync(briefDir, { recursive: true });
-  mkdirSync(join(briefDir, DIRS.state), { recursive: true });
-  mkdirSync(join(briefDir, DIRS.people), { recursive: true });
-  mkdirSync(join(briefDir, DIRS.rules), { recursive: true });
-  mkdirSync(join(briefDir, DIRS.raw), { recursive: true });
-
-  // Copy rules templates — check both dist and src paths
-  let templatesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "templates", "rules");
-  if (!existsSync(templatesDir)) {
-    // Fallback to src/templates when running from dist/
-    templatesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "templates", "rules");
+  for (const relativeDir of manifest.requiredDirs) {
+    mkdirSync(join(briefDir, relativeDir), { recursive: true });
   }
-  if (existsSync(templatesDir)) {
-    for (const file of readdirSync(templatesDir)) {
-      const src = join(templatesDir, file);
-      const dest = join(briefDir, DIRS.rules, file);
-      if (!existsSync(dest)) {
-        writeFileSync(dest, readFileSync(src, "utf-8"));
-      }
+
+  const templateDir = getTemplateDir();
+  const rulesSrc = join(templateDir, DIRS.rules);
+  const availableRuleFiles = existsSync(rulesSrc)
+    ? readdirSync(rulesSrc).filter((file) => file.endsWith(".md"))
+    : [];
+
+  for (const ruleFile of manifest.ruleTemplateFiles) {
+    const src = join(rulesSrc, ruleFile);
+    const dest = join(briefDir, DIRS.rules, ruleFile);
+    if (availableRuleFiles.includes(ruleFile)) {
+      writeFileSync(dest, readFileSync(src, "utf-8"));
     }
   }
 
-  const fm = makeFrontmatter();
-  const useTemplate = options.template === "startup";
-
-  // Create files
-  writeFileSync(join(briefDir, FILES.priorities), fm + (useTemplate ? STARTUP_PRIORITIES : "# Priorities\n"));
-  writeFileSync(join(briefDir, FILES.prioritiesRaw), fm + "# Priorities (Raw)\n\nThis file is auto-generated by `brief sync`. Do not edit — edit priorities.md instead.\n");
-  writeFileSync(join(briefDir, FILES.decisions), fm + (useTemplate ? STARTUP_DECISIONS : "# Recent Decisions\n"));
-  writeFileSync(join(briefDir, FILES.team), fm + (useTemplate ? STARTUP_TEAM : "# Team\n"));
-  writeFileSync(join(briefDir, FILES.overrides), useTemplate ? STARTUP_OVERRIDES : "# Overrides\n");
-  writeFileSync(join(briefDir, FILES.agentLog), "# Agent Actions\n");
-  writeFileSync(join(briefDir, FILES.hash), "");
-  writeFileSync(join(briefDir, FILES.sources), "");
-
-  // Create blank PRIORITIES-HUMAN.md template
-  const humanPriFile = join(briefDir, FILES.humanPriorities);
-  if (!existsSync(humanPriFile)) {
-    writeFileSync(humanPriFile, `# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: (not yet)\n\n## Product Priorities\n- P0: (run the interview — see rules/INTERVIEW.md)\n\n## Active Deals\n- (none yet)\n\n## Do NOT Work On\n- (none yet)\n\n## Blockers Needing Human Decision\n- (none yet)\n`);
+  for (const relativeFile of manifest.seedFiles) {
+    const fullPath = join(briefDir, relativeFile);
+    writeFileSync(fullPath, buildSeedContent(relativeFile, useTemplate, briefDir));
   }
 
-  console.log(chalk.green("  ✓ .brief/ initialized.\n"));
-  console.log(chalk.yellow("  ⚠ Next: run the priority interview before fetching data."));
-  console.log(chalk.dim("  Read .brief/rules/INTERVIEW.md and update .brief/PRIORITIES-HUMAN.md"));
-  console.log(chalk.dim("  Then: read .brief/rules/SETUP.md to configure data sources.\n"));
+  console.log(`Initialized Brief in ${briefDir}`);
 
-  // Detect existing conventions
-  if (options.detect !== false) {
-    const cwd = process.cwd();
-    const conventions = [
-      { file: "CLAUDE.md", tool: "Claude Code" },
-      { file: "AGENTS.md", tool: "AI agents" },
-      { file: ".cursorrules", tool: "Cursor" },
-      { file: ".codex/instructions", tool: "Codex" },
-    ];
-
-    for (const { file, tool } of conventions) {
-      if (existsSync(join(cwd, file))) {
-        console.log(chalk.dim(`  Found ${file} (${tool}). Run 'brief snippet ${tool.toLowerCase().split(" ")[0]}' to get integration code.\n`));
-      }
-    }
+  if (useTemplate) {
+    console.log("\nStartup template created:");
+    console.log("- Human priorities interview scaffold");
+    console.log("- Rules directory with build/fetch/interview/morning/evening guides");
+    console.log("- Raw/ state/ people/ directories");
   }
+
+  console.log("\nNext steps:");
+  console.log("1. Fill in .brief/PRIORITIES-HUMAN.md");
+  console.log("2. Configure sources in .brief/.sources");
+  console.log("3. Run `brief check --health`");
+  console.log("4. Run `brief fetch`");
 }

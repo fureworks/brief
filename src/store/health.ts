@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { CURRENT_SCHEMA, FILES, getBriefDir } from "./paths.js";
+import { FILES, getBriefDir, getStartupSchemaManifest } from "./paths.js";
 
 export type BriefHealthState =
   | "healthy-current-schema"
@@ -31,8 +31,6 @@ function staleReasons(briefDir: string): string[] {
   const reasons: string[] = [];
   const prioritiesFile = join(briefDir, FILES.priorities);
   const rawFile = join(briefDir, FILES.prioritiesRaw);
-  const humanFile = join(briefDir, FILES.humanPriorities);
-
   if (!existsSync(rawFile)) {
     reasons.push(`Missing ${FILES.prioritiesRaw}.`);
   }
@@ -49,19 +47,13 @@ function staleReasons(briefDir: string): string[] {
     }
   }
 
-  if (existsSync(humanFile)) {
-    const content = readFileSync(humanFile, "utf-8");
-    if (content.includes("Last reviewed: (not yet)")) {
-      reasons.push(`${FILES.humanPriorities} has not been reviewed yet.`);
-    }
-  }
-
   return reasons;
 }
 
 export function assessBriefHealth(base: string = process.cwd()): BriefHealthReport {
   const briefDir = getBriefDir(base);
   const checkedAt = new Date().toISOString();
+  const manifest = getStartupSchemaManifest();
 
   if (!existsSync(briefDir)) {
     return {
@@ -75,9 +67,8 @@ export function assessBriefHealth(base: string = process.cwd()): BriefHealthRepo
     };
   }
 
-  const requiredPaths = [...CURRENT_SCHEMA.requiredDirs, ...CURRENT_SCHEMA.requiredFiles];
-  const present = existingPaths(briefDir, requiredPaths);
-  const missing = missingPaths(briefDir, requiredPaths);
+  const present = existingPaths(briefDir, manifest.requiredPaths);
+  const missing = missingPaths(briefDir, manifest.requiredPaths);
 
   if (missing.length === 0) {
     const stale = staleReasons(briefDir);
@@ -104,8 +95,8 @@ export function assessBriefHealth(base: string = process.cwd()): BriefHealthRepo
     };
   }
 
-  const legacyPresent = existingPaths(briefDir, CURRENT_SCHEMA.legacySignals);
-  const missingCurrentMarkers = missingPaths(briefDir, CURRENT_SCHEMA.legacyMissingMarkers);
+  const legacyPresent = existingPaths(briefDir, manifest.legacySignals);
+  const missingCurrentMarkers = missingPaths(briefDir, manifest.legacyMissingMarkers);
   const looksLegacy = legacyPresent.length >= 3 && missingCurrentMarkers.length > 0;
 
   if (looksLegacy) {

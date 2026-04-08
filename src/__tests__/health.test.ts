@@ -1,51 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { assessBriefHealth } from "../store/health.js";
-import { getStartupSchemaManifest, FILES } from "../store/paths.js";
-
-function makeTestDir(name: string): string {
-  const dir = `/tmp/brief-health-${name}-${Date.now()}`;
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function createCurrentSchema(dir: string, options: { stale?: boolean } = {}): void {
-  const briefDir = join(dir, ".brief");
-  const manifest = getStartupSchemaManifest();
-
-  mkdirSync(briefDir, { recursive: true });
-  for (const relativeDir of manifest.requiredDirs) {
-    mkdirSync(join(briefDir, relativeDir), { recursive: true });
-  }
-
-  for (const relativeFile of manifest.requiredFiles) {
-    const fullPath = join(briefDir, relativeFile);
-    mkdirSync(join(fullPath, ".."), { recursive: true });
-    let content = "ok\n";
-    if (relativeFile === FILES.humanPriorities) {
-      content = "# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: \n";
-    }
-    writeFileSync(fullPath, content);
-  }
-
-  const prioritiesFile = join(briefDir, FILES.priorities);
-  const rawFile = join(briefDir, FILES.prioritiesRaw);
-  utimesSync(rawFile, new Date("2026-04-08T00:00:00Z"), new Date("2026-04-08T00:00:00Z"));
-  utimesSync(prioritiesFile, new Date("2026-04-08T01:00:00Z"), new Date("2026-04-08T01:00:00Z"));
-
-  if (options.stale) {
-    utimesSync(prioritiesFile, new Date("2026-04-08T00:00:00Z"), new Date("2026-04-08T00:00:00Z"));
-    utimesSync(rawFile, new Date("2026-04-08T01:00:00Z"), new Date("2026-04-08T01:00:00Z"));
-  }
-}
+import { FILES } from "../store/paths.js";
+import {
+  cleanupDir,
+  createCurrentWorkspace,
+  createLegacyWorkspace,
+  createMisconfiguredWorkspace,
+  makeTestDir,
+} from "./helpers/workspaces.js";
 
 describe("assessBriefHealth", () => {
   const dirs: string[] = [];
 
   afterEach(() => {
     for (const dir of dirs) {
-      rmSync(dir, { recursive: true, force: true });
+      cleanupDir(dir);
     }
     dirs.length = 0;
   });
@@ -53,7 +22,7 @@ describe("assessBriefHealth", () => {
   it("detects healthy current schema", () => {
     const dir = makeTestDir("healthy");
     dirs.push(dir);
-    createCurrentSchema(dir);
+    createCurrentWorkspace(dir);
 
     const report = assessBriefHealth(dir);
     expect(report.state).toBe("healthy-current-schema");
@@ -63,7 +32,7 @@ describe("assessBriefHealth", () => {
   it("detects stale current schema", () => {
     const dir = makeTestDir("stale");
     dirs.push(dir);
-    createCurrentSchema(dir, { stale: true });
+    createCurrentWorkspace(dir, { stale: true });
 
     const report = assessBriefHealth(dir);
     expect(report.state).toBe("stale");
@@ -73,15 +42,7 @@ describe("assessBriefHealth", () => {
   it("detects legacy schema when old core files exist but current markers are missing", () => {
     const dir = makeTestDir("legacy");
     dirs.push(dir);
-    const briefDir = join(dir, ".brief");
-    mkdirSync(join(briefDir, "state"), { recursive: true });
-    mkdirSync(join(briefDir, "people"), { recursive: true });
-    writeFileSync(join(briefDir, FILES.priorities), "# Priorities\n");
-    writeFileSync(join(briefDir, FILES.prioritiesRaw), "# Raw\n");
-    writeFileSync(join(briefDir, FILES.decisions), "# Decisions\n");
-    writeFileSync(join(briefDir, FILES.team), "# Team\n");
-    writeFileSync(join(briefDir, FILES.overrides), "# Overrides\n");
-    writeFileSync(join(briefDir, FILES.agentLog), "# Agent Log\n");
+    createLegacyWorkspace(dir);
 
     const report = assessBriefHealth(dir);
     expect(report.state).toBe("legacy-schema");
@@ -99,9 +60,7 @@ describe("assessBriefHealth", () => {
   it("detects misconfigured brief directories", () => {
     const dir = makeTestDir("misconfigured");
     dirs.push(dir);
-    const briefDir = join(dir, ".brief");
-    mkdirSync(join(briefDir, "rules"), { recursive: true });
-    writeFileSync(join(briefDir, "rules", "BUILD.md"), "# Build\n");
+    createMisconfiguredWorkspace(dir);
 
     const report = assessBriefHealth(dir);
     expect(report.state).toBe("misconfigured");

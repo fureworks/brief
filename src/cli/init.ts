@@ -62,8 +62,8 @@ export async function initCommand(options: InitOptions): Promise<void> {
   mkdirSync(briefDir, { recursive: true });
   mkdirSync(join(briefDir, DIRS.state), { recursive: true });
   mkdirSync(join(briefDir, DIRS.people), { recursive: true });
-  mkdirSync(join(briefDir, "rules"), { recursive: true });
-  mkdirSync(join(briefDir, "raw"), { recursive: true });
+  mkdirSync(join(briefDir, DIRS.rules), { recursive: true });
+  mkdirSync(join(briefDir, DIRS.raw), { recursive: true });
 
   // Copy rules templates — check both dist and src paths
   let templatesDir = join(dirname(fileURLToPath(import.meta.url)), "..", "templates", "rules");
@@ -74,7 +74,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   if (existsSync(templatesDir)) {
     for (const file of readdirSync(templatesDir)) {
       const src = join(templatesDir, file);
-      const dest = join(briefDir, "rules", file);
+      const dest = join(briefDir, DIRS.rules, file);
       if (!existsSync(dest)) {
         writeFileSync(dest, readFileSync(src, "utf-8"));
       }
@@ -95,7 +95,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   writeFileSync(join(briefDir, FILES.sources), "");
 
   // Create blank PRIORITIES-HUMAN.md template
-  const humanPriFile = join(briefDir, "PRIORITIES-HUMAN.md");
+  const humanPriFile = join(briefDir, FILES.humanPriorities);
   if (!existsSync(humanPriFile)) {
     writeFileSync(humanPriFile, `# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: (not yet)\n\n## Product Priorities\n- P0: (run the interview — see rules/INTERVIEW.md)\n\n## Active Deals\n- (none yet)\n\n## Do NOT Work On\n- (none yet)\n\n## Blockers Needing Human Decision\n- (none yet)\n`);
   }

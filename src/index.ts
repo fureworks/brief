@@ -32,8 +32,10 @@ program
 
 program
   .command("check")
-  .description("Change detection for automation (exit 0=ok, 1=changed, 2=urgent, 5=enrichment stale)")
+  .description("Change detection and health inspection for automation")
   .option("--enrichment", "Check if enrichment is stale instead of file changes")
+  .option("--health", "Inspect brief health/schema state")
+  .option("--json", "Output health as JSON (use with --health)")
   .action(checkCommand);
 
 program.parse();

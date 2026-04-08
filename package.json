@@ -1,6 +1,6 @@
 {
   "name": "@fureworks/brief",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Team working memory for AI agents and humans.",
   "main": "index.js",
   "directories": {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { assessBriefHealth } from "../store/health.js";
-import { CURRENT_SCHEMA, FILES } from "../store/paths.js";
+import { getStartupSchemaManifest, FILES } from "../store/paths.js";
 
 function makeTestDir(name: string): string {
   const dir = `/tmp/brief-health-${name}-${Date.now()}`;
@@ -10,22 +10,21 @@ function makeTestDir(name: string): string {
   return dir;
 }
 
-function createCurrentSchema(dir: string, options: { stale?: boolean; unreviewedHuman?: boolean } = {}): void {
+function createCurrentSchema(dir: string, options: { stale?: boolean } = {}): void {
   const briefDir = join(dir, ".brief");
-  mkdirSync(briefDir, { recursive: true });
+  const manifest = getStartupSchemaManifest();
 
-  for (const relativeDir of CURRENT_SCHEMA.requiredDirs) {
+  mkdirSync(briefDir, { recursive: true });
+  for (const relativeDir of manifest.requiredDirs) {
     mkdirSync(join(briefDir, relativeDir), { recursive: true });
   }
 
-  for (const relativeFile of CURRENT_SCHEMA.requiredFiles) {
+  for (const relativeFile of manifest.requiredFiles) {
     const fullPath = join(briefDir, relativeFile);
     mkdirSync(join(fullPath, ".."), { recursive: true });
     let content = "ok\n";
     if (relativeFile === FILES.humanPriorities) {
-      content = options.unreviewedHuman
-        ? "# Human Priorities\n\nLast reviewed: (not yet)\n"
-        : "# Human Priorities\n\nLast reviewed: 2026-04-08\nReviewer: test\n";
+      content = "# Human Priorities\n\nLast reviewed: (not yet)\nReviewer: \n";
     }
     writeFileSync(fullPath, content);
   }
@@ -34,6 +33,7 @@ function createCurrentSchema(dir: string, options: { stale?: boolean; unreviewed
   const rawFile = join(briefDir, FILES.prioritiesRaw);
   utimesSync(rawFile, new Date("2026-04-08T00:00:00Z"), new Date("2026-04-08T00:00:00Z"));
   utimesSync(prioritiesFile, new Date("2026-04-08T01:00:00Z"), new Date("2026-04-08T01:00:00Z"));
+
   if (options.stale) {
     utimesSync(prioritiesFile, new Date("2026-04-08T00:00:00Z"), new Date("2026-04-08T00:00:00Z"));
     utimesSync(rawFile, new Date("2026-04-08T01:00:00Z"), new Date("2026-04-08T01:00:00Z"));

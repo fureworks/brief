@@ -1,44 +1,56 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, rmSync, readFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
-
-const TEST_DIR = "/tmp/brief-test-init";
-const CLI = join(process.cwd(), "dist/index.js");
+import { tmpdir } from "node:os";
+import { initCommand } from "../cli/init.js";
+import { assessBriefHealth } from "../store/health.js";
+import { FILES, getBriefDir, getStartupSchemaManifest } from "../store/paths.js";
 
 describe("brief init", () => {
+  const originalCwd = process.cwd();
+  let testDir: string;
+
   beforeEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
-    execSync(`mkdir -p ${TEST_DIR}`);
+    testDir = mkdtempSync(join(tmpdir(), "brief-init-"));
+    process.chdir(testDir);
   });
 
   afterEach(() => {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    process.chdir(originalCwd);
+    rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("creates .brief/ directory structure", () => {
-    execSync(`node ${CLI} init`, { cwd: TEST_DIR });
-    expect(existsSync(join(TEST_DIR, ".brief"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/priorities.md"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/decisions.md"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/team.md"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/overrides.md"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/agent-log.md"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/state"))).toBe(true);
-    expect(existsSync(join(TEST_DIR, ".brief/people"))).toBe(true);
+  it("creates every required path from the startup schema manifest", async () => {
+    await initCommand({ template: "startup" });
+
+    const briefDir = getBriefDir(testDir);
+    const manifest = getStartupSchemaManifest();
+
+    for (const relativeDir of manifest.requiredDirs) {
+      expect(existsSync(join(briefDir, relativeDir))).toBe(true);
+    }
+
+    for (const relativeFile of manifest.requiredFiles) {
+      expect(existsSync(join(briefDir, relativeFile))).toBe(true);
+    }
   });
 
-  it("--template startup adds example content", () => {
-    execSync(`node ${CLI} init --template startup`, { cwd: TEST_DIR });
-    const priorities = readFileSync(join(TEST_DIR, ".brief/priorities.md"), "utf-8");
-    expect(priorities).toContain("## NOW");
-    expect(priorities).toContain("## TODAY");
-    expect(priorities).toContain("brief_version: 1");
+  it("creates a workspace that health detection immediately recognizes as current schema", async () => {
+    await initCommand({ template: "startup" });
+
+    const report = assessBriefHealth(testDir);
+    expect(report.state).toBe("healthy-current-schema");
+    expect(report.schema).toBe("current");
   });
 
-  it("refuses to init if .brief/ already exists", () => {
-    execSync(`node ${CLI} init`, { cwd: TEST_DIR });
-    const output = execSync(`node ${CLI} init`, { cwd: TEST_DIR, encoding: "utf-8" });
-    expect(output).toContain("already exists");
+  it("seeds the expected startup artifacts", async () => {
+    await initCommand({ template: "startup" });
+
+    const briefDir = getBriefDir(testDir);
+    const humanPriorities = readFileSync(join(briefDir, FILES.humanPriorities), "utf-8");
+    const sources = readFileSync(join(briefDir, FILES.sources), "utf-8");
+
+    expect(humanPriorities).toContain("# Human Priorities");
+    expect(sources.trim()).toBe("[]");
   });
 });

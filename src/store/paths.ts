@@ -1,4 +1,8 @@
-import { join } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export function getBriefDir(base: string = process.cwd()): string {
   return join(base, ".brief");
@@ -24,30 +28,58 @@ export const DIRS = {
   raw: "raw",
 } as const;
 
-export const RULE_TEMPLATES = [
-  "BUILD.md",
-  "EVENING.md",
-  "FETCH.md",
-  "INTERVIEW.md",
-  "MORNING.md",
-  "SETUP.md",
-] as const;
+export interface BriefSchemaManifest {
+  template: "startup";
+  requiredDirs: string[];
+  seedFiles: string[];
+  ruleTemplateFiles: string[];
+  requiredFiles: string[];
+  requiredPaths: string[];
+  currentSchemaMarkers: string[];
+  legacySignals: string[];
+  legacyMissingMarkers: string[];
+}
 
-export const CURRENT_SCHEMA = {
-  requiredFiles: [
+function getRulesTemplateDir(): string {
+  const distPath = join(__dirname, "..", "templates", DIRS.rules);
+  if (existsSync(distPath)) return distPath;
+  return join(__dirname, "..", "..", "src", "templates", DIRS.rules);
+}
+
+export function getRuleTemplateFiles(): string[] {
+  const rulesDir = getRulesTemplateDir();
+  if (!existsSync(rulesDir)) return [];
+  return readdirSync(rulesDir)
+    .filter((file) => file.endsWith(".md"))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export function getStartupSchemaManifest(): BriefSchemaManifest {
+  const requiredDirs = [DIRS.state, DIRS.people, DIRS.rules, DIRS.raw];
+  const seedFiles = [
     FILES.priorities,
     FILES.prioritiesRaw,
     FILES.decisions,
+    FILES.decisionsRaw,
     FILES.team,
     FILES.overrides,
     FILES.agentLog,
     FILES.hash,
     FILES.sources,
     FILES.humanPriorities,
-    ...RULE_TEMPLATES.map((rule) => join(DIRS.rules, rule)),
-  ],
-  requiredDirs: [DIRS.state, DIRS.people, DIRS.rules, DIRS.raw],
-  legacySignals: [
+  ];
+  const ruleTemplateFiles = getRuleTemplateFiles();
+  const requiredFiles = [
+    ...seedFiles,
+    ...ruleTemplateFiles.map((ruleFile) => join(DIRS.rules, ruleFile)),
+  ];
+  const currentSchemaMarkers = [
+    FILES.humanPriorities,
+    join(DIRS.rules, "BUILD.md"),
+    join(DIRS.rules, "INTERVIEW.md"),
+    DIRS.raw,
+  ];
+  const legacySignals = [
     FILES.priorities,
     FILES.prioritiesRaw,
     FILES.decisions,
@@ -56,6 +88,17 @@ export const CURRENT_SCHEMA = {
     FILES.agentLog,
     DIRS.state,
     DIRS.people,
-  ],
-  legacyMissingMarkers: [FILES.humanPriorities, join(DIRS.rules, "BUILD.md"), join(DIRS.rules, "INTERVIEW.md"), DIRS.raw],
-} as const;
+  ];
+
+  return {
+    template: "startup",
+    requiredDirs,
+    seedFiles,
+    ruleTemplateFiles,
+    requiredFiles,
+    requiredPaths: [...requiredDirs, ...requiredFiles],
+    currentSchemaMarkers,
+    legacySignals,
+    legacyMissingMarkers: currentSchemaMarkers,
+  };
+}

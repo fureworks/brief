@@ -134,6 +134,10 @@ export function assessBriefHealth(base: string = process.cwd()): BriefHealthRepo
   };
 }
 
+export function formatHealthReport(report: BriefHealthReport): string[] {
+  return [`health: ${report.state}`, ...report.reasons.map((reason) => `- ${reason}`)];
+}
+
 export function exitCodeForHealth(state: BriefHealthState): number {
   switch (state) {
     case "healthy-current-schema":
